@@ -24,7 +24,8 @@ import json  # Jaunais imports Esri JSON
 
 # Supabase konfigurācija (Aizvietojiet ar savām faktiskajām vērtībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
-supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVod2JmbHFkcmlwYXRmcGJiZXRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDcxODE2MywiZXhwIjoyMDQ2Mjk0MTYzfQ.78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"  # Aizvietojiet ar savu Supabase atslēgu
+supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVod2JmbHFkcmlwYXRmcGJiZXRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDcxODE2MywiZXhwIjoyMDQ2Mjk0MTYzfQ.78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"  # Aizvietojiet ar drošu metodi
+
 
 # Konstantas
 APP_NAME = "Kadastrs"
@@ -401,8 +402,10 @@ def process_polygon(polygon_gdf, input_method):
         progress_text.text(translations[language].get("preparing_geojson", "1. Preparing GeoJSON file..."))
 
         # ArcGIS REST servisa konfigurācija
-        arcgis_base_url = "https://utility.arcgis.com/usrsvcs/servers/4923f6b355934843b33aa92718520f12/rest/services/Hosted/Kadastrs/FeatureServer/0/query"
-        # Layer 0, var pielāgot atbilstoši jūsu servisa struktūrai
+        # Izvēlieties pareizu slāņa id, piemēram, 8 ("Zemes vienības")
+        layer_id = 8  # Aizvietojiet ar nepieciešamo slāņa id
+        arcgis_base_url = f"https://utility.arcgis.com/usrsvcs/servers/4923f6b355934843b33aa92718520f12/rest/services/Hosted/Kadastrs/FeatureServer/{layer_id}/query"
+        # Layer 8, var pielāgot atbilstoši jūsu servisa struktūrai
 
         polygon_gdf = polygon_gdf.to_crs(epsg=4326)  # ArcGIS REST parasti lieto WGS84
         progress_bar.progress(10)
@@ -430,6 +433,7 @@ def process_polygon(polygon_gdf, input_method):
             else:
                 raise ValueError("Unsupported geometry type.")
 
+        # Pieņemot, ka polygon_gdf satur tikai vienu poligonu
         polygon_esri_json = shapely_to_esri_json(polygon_gdf.geometry.iloc[0])
         progress_bar.progress(20)
 
@@ -451,8 +455,13 @@ def process_polygon(polygon_gdf, input_method):
         progress_bar.progress(30)
 
         if response.status_code == 200:
-            arcgis_data = response.json()
-            if 'features' in arcgis_data and arcgis_data['features']:
+            try:
+                arcgis_data = response.json()
+            except json.JSONDecodeError as jde:
+                st.error(translations[language]["error_display_pdf"].format(error=f"JSON Decode Error: {jde}"))
+                arcgis_data = None
+
+            if arcgis_data and 'features' in arcgis_data and arcgis_data['features']:
                 arcgis_gdf = gpd.GeoDataFrame.from_features(arcgis_data['features'])
                 arcgis_gdf = arcgis_gdf.set_crs(epsg=4326).to_crs(epsg=3059)
                 progress_bar.progress(50)
