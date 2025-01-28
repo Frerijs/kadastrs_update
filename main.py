@@ -20,6 +20,7 @@ from ezdxf.enums import TextHAlign  # Importēt TextHAlign teksta izlīdzināša
 from folium import MacroElement
 from jinja2 import Template
 import base64  # Jaunais imports PDF attēlošanai
+import json  # Jaunais imports Esri JSON
 
 # Supabase konfigurācija (Aizvietojiet ar savām faktiskajām vērtībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
@@ -240,58 +241,6 @@ def show_login():
         submit_button = st.form_submit_button(label=("Pieslēgties" if language=="Latviešu" else "Login"), on_click=login)
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
-# Funkcija lietotāja pieteikšanās reģistrēšanai
-def log_user_login(username):
-    try:
-        riga_tz = ZoneInfo('Europe/Riga')
-        current_time = datetime.datetime.now(riga_tz).isoformat()
-        data = {
-            "username": username,
-            "App": APP_NAME,
-            "Ver": APP_VERSION,
-            "app_type": APP_TYPE,
-            "login_time": current_time
-        }
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json"
-        }
-        url = f"{supabase_url}/rest/v1/user_data"
-        response = requests.post(url, json=data, headers=headers)
-        if response.status_code not in [200, 201]:
-            st.error(translations[language]["error_authenticate"].format(status_code=response.status_code) + f", {response.text}")
-    except Exception as e:
-        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-
-# Funkcija lietotāja autentifikācijai
-def authenticate(username, password):
-    try:
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json",
-        }
-        url = f"{supabase_url}/rest/v1/users"
-        params = {
-            "select": "*",
-            "username": f"eq.{username}",
-            "password": f"eq.{password}",
-        }
-        response = requests.get(url, headers=headers, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                return True
-            else:
-                return False
-        else:
-            st.error(translations[language]["error_authenticate"].format(status_code=response.status_code))
-            return False
-    except Exception as e:
-        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-        return False
-
 # Funkcija, kas attēlo PDF failu lietotnē
 def display_pdf(file_path):
     try:
@@ -458,13 +407,35 @@ def process_polygon(polygon_gdf, input_method):
         polygon_gdf = polygon_gdf.to_crs(epsg=4326)  # ArcGIS REST parasti lieto WGS84
         progress_bar.progress(10)
 
-        # Poligona ģeometrija GeoJSON formātā
-        polygon_geojson = polygon_gdf.geometry.to_json()
+        # Pārveidojiet shapely ģeometriju uz Esri JSON
+        def shapely_to_esri_json(geom):
+            if geom.type == 'Polygon':
+                rings = [list(geom.exterior.coords)]
+                for interior in geom.interiors:
+                    rings.append(list(interior.coords))
+                return {
+                    "rings": rings,
+                    "spatialReference": {"wkid": 4326}
+                }
+            elif geom.type == 'MultiPolygon':
+                rings = []
+                for poly in geom.geoms:
+                    rings.append(list(poly.exterior.coords))
+                    for interior in poly.interiors:
+                        rings.append(list(interior.coords))
+                return {
+                    "rings": rings,
+                    "spatialReference": {"wkid": 4326}
+                }
+            else:
+                raise ValueError("Unsupported geometry type.")
+
+        polygon_esri_json = shapely_to_esri_json(polygon_gdf.geometry.iloc[0])
         progress_bar.progress(20)
 
         # Parametri ArcGIS REST query
         params = {
-            'geometry': polygon_geojson,
+            'geometry': json.dumps(polygon_esri_json),
             'geometryType': 'esriGeometryPolygon',
             'spatialRel': 'esriSpatialRelIntersects',
             'outFields': '*',
@@ -472,24 +443,21 @@ def process_polygon(polygon_gdf, input_method):
             'f': 'geojson'
         }
 
-        # Kods, lai pārvērstu GeoJSON ģeometriju ArcGIS REST parametrā
-        # Izmantojot GeoJSON ģeometriju tieši var būt izaicinājumi, bet ArcGIS REST atbalsta GeoJSON formātu
-
-        # Sagatavot URL ar parametriem
-        query_url = f"{arcgis_base_url}?{urlencode(params)}"
-        progress_bar.progress(30)
+        # Debug: izdrukājiet parametrus, lai pārbaudītu
+        # st.write("ArcGIS REST Query Parameters:", params)
 
         # Veikt pieprasījumu
-        response = requests.get(query_url)
+        response = requests.get(arcgis_base_url, params=params)
+        progress_bar.progress(30)
+
         if response.status_code == 200:
             arcgis_data = response.json()
-            if 'features' in arcgis_data:
+            if 'features' in arcgis_data and arcgis_data['features']:
                 arcgis_gdf = gpd.GeoDataFrame.from_features(arcgis_data['features'])
                 arcgis_gdf = arcgis_gdf.set_crs(epsg=4326).to_crs(epsg=3059)
                 progress_bar.progress(50)
 
                 # Apvieno ar ievadīto poligonu, ja nepieciešams
-                # Piemēram, izvēlas tikai tos paraugus, kas krusto ar poligonu
                 joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
                 progress_bar.progress(80)
 
@@ -526,6 +494,10 @@ def process_polygon(polygon_gdf, input_method):
 
 # Funkcija, lai parādītu karti ar rezultātiem
 def display_map_with_results():
+    if 'joined_gdf' not in st.session_state:
+        st.error("Dati nav pieejami kartes attēlošanai.")
+        return
+
     joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
     polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
     input_method = st.session_state.get('input_method', 'drawn')
