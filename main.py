@@ -62,7 +62,7 @@ translations = {
         "preparing_shapefile": "2. Sagatavo Shapefile ZIP failu...",
         "preparing_dxf": "3. Sagatavo DXF failu...",
         "preparing_csv": "4. Sagatavo CSV failu...",
-        "warning_code_missing": 'Kolonna "code" nav pieejama WFS datos. Teksts netiks pievienots DXF failā.',
+        "warning_code_missing": 'Kolonna "code" nav pieejama ArcGIS REST servisa datos. Teksts netiks pievienots DXF failā.',
         "instructions": "Instrukcija"
     },
     "English": {
@@ -95,7 +95,7 @@ translations = {
         "preparing_shapefile": "2. Preparing Shapefile ZIP file...",
         "preparing_dxf": "3. Preparing DXF file...",
         "preparing_csv": "4. Preparing CSV file...",
-        "warning_code_missing": '"code" column is not available in WFS data. Text will not be added to the DXF file.',
+        "warning_code_missing": '"code" column is not available in ArcGIS REST service data. Text will not be added to the DXF file.',
         "instructions": "Instructions"
     }
 }
@@ -239,6 +239,58 @@ def show_login():
         password = st.text_input("Parole" if language=="Latviešu" else "Password", type="password", key='password')
         submit_button = st.form_submit_button(label=("Pieslēgties" if language=="Latviešu" else "Login"), on_click=login)
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
+
+# Funkcija lietotāja pieteikšanās reģistrēšanai
+def log_user_login(username):
+    try:
+        riga_tz = ZoneInfo('Europe/Riga')
+        current_time = datetime.datetime.now(riga_tz).isoformat()
+        data = {
+            "username": username,
+            "App": APP_NAME,
+            "Ver": APP_VERSION,
+            "app_type": APP_TYPE,
+            "login_time": current_time
+        }
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json"
+        }
+        url = f"{supabase_url}/rest/v1/user_data"
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code not in [200, 201]:
+            st.error(translations[language]["error_authenticate"].format(status_code=response.status_code) + f", {response.text}")
+    except Exception as e:
+        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+
+# Funkcija lietotāja autentifikācijai
+def authenticate(username, password):
+    try:
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json",
+        }
+        url = f"{supabase_url}/rest/v1/users"
+        params = {
+            "select": "*",
+            "username": f"eq.{username}",
+            "password": f"eq.{password}",
+        }
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return True
+            else:
+                return False
+        else:
+            st.error(translations[language]["error_authenticate"].format(status_code=response.status_code))
+            return False
+    except Exception as e:
+        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        return False
 
 # Funkcija, kas attēlo PDF failu lietotnē
 def display_pdf(file_path):
@@ -388,7 +440,8 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
     except Exception as e:
         st.error((f"Neizdevās pievienot {name} slāni: {e}" if language=="Latviešu" else f"Failed to add {name} layer: {e}"))
 
-# Funkcija, lai apstrādātu poligonu un iegūtu datus
+# *** GALVENĀ IZMAIŅA ŠAI FUNKCIJAI ***
+# Funkcija, lai apstrādātu poligonu un iegūtu datus no ArcGIS REST servisa
 def process_polygon(polygon_gdf, input_method):
     try:
         progress_bar = st.progress(0)
@@ -397,58 +450,73 @@ def process_polygon(polygon_gdf, input_method):
         st.session_state['input_method'] = input_method
 
         progress_text.text(translations[language].get("preparing_geojson", "1. Preparing GeoJSON file..."))
-        wfs_url = 'https://lvmgeoserver.lvm.lv/geoserver/publicwfs/wfs'
-        typename = 'publicwfs:kkparcel'
 
-        polygon_gdf = polygon_gdf.to_crs(epsg=3059)
+        # ArcGIS REST servisa konfigurācija
+        arcgis_base_url = "https://utility.arcgis.com/usrsvcs/servers/4923f6b355934843b33aa92718520f12/rest/services/Hosted/Kadastrs/FeatureServer/0/query"
+        # Layer 0, var pielāgot atbilstoši jūsu servisa struktūrai
+
+        polygon_gdf = polygon_gdf.to_crs(epsg=4326)  # ArcGIS REST parasti lieto WGS84
         progress_bar.progress(10)
 
-        minx, miny, maxx, maxy = polygon_gdf.total_bounds
+        # Poligona ģeometrija GeoJSON formātā
+        polygon_geojson = polygon_gdf.geometry.to_json()
         progress_bar.progress(20)
 
+        # Parametri ArcGIS REST query
         params = {
-            'service': 'WFS',
-            'version': '2.0.0',
-            'request': 'GetFeature',
-            'typename': typename,
-            'outputFormat': 'application/json',
-            'srsname': 'EPSG:3059',
-            'bbox': f'{minx},{miny},{maxx},{maxy},EPSG:3059'
+            'geometry': polygon_geojson,
+            'geometryType': 'esriGeometryPolygon',
+            'spatialRel': 'esriSpatialRelIntersects',
+            'outFields': '*',
+            'returnGeometry': 'true',
+            'f': 'geojson'
         }
 
-        url = f"{wfs_url}?{urlencode(params)}"
+        # Kods, lai pārvērstu GeoJSON ģeometriju ArcGIS REST parametrā
+        # Izmantojot GeoJSON ģeometriju tieši var būt izaicinājumi, bet ArcGIS REST atbalsta GeoJSON formātu
+
+        # Sagatavot URL ar parametriem
+        query_url = f"{arcgis_base_url}?{urlencode(params)}"
         progress_bar.progress(30)
 
-        wfs_gdf = gpd.read_file(url)
-        progress_bar.progress(50)
+        # Veikt pieprasījumu
+        response = requests.get(query_url)
+        if response.status_code == 200:
+            arcgis_data = response.json()
+            if 'features' in arcgis_data:
+                arcgis_gdf = gpd.GeoDataFrame.from_features(arcgis_data['features'])
+                arcgis_gdf = arcgis_gdf.set_crs(epsg=4326).to_crs(epsg=3059)
+                progress_bar.progress(50)
 
-        wfs_gdf = wfs_gdf.to_crs(epsg=3059)
-        polygon_gdf = polygon_gdf.to_crs(epsg=3059)
-        progress_bar.progress(60)
+                # Apvieno ar ievadīto poligonu, ja nepieciešams
+                # Piemēram, izvēlas tikai tos paraugus, kas krusto ar poligonu
+                joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
+                progress_bar.progress(80)
 
-        joined_gdf = gpd.sjoin(wfs_gdf, polygon_gdf, how='inner', predicate='intersects')
-        progress_bar.progress(80)
+                joined_gdf = joined_gdf.reset_index(drop=True).fillna('')
 
-        joined_gdf = joined_gdf.reset_index(drop=True).fillna('')
+                for col in joined_gdf.columns:
+                    if col != 'geometry':
+                        if not pd.api.types.is_string_dtype(joined_gdf[col]):
+                            joined_gdf[col] = joined_gdf[col].astype(str)
 
-        for col in joined_gdf.columns:
-            if col != 'geometry':
-                if not pd.api.types.is_string_dtype(joined_gdf[col]):
-                    joined_gdf[col] = joined_gdf[col].astype(str)
+                invalid_geometries = ~joined_gdf.is_valid
+                if invalid_geometries.any():
+                    joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
+                progress_bar.progress(100)
 
-        invalid_geometries = ~joined_gdf.is_valid
-        if invalid_geometries.any():
-            joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
-        progress_bar.progress(100)
+                st.session_state['joined_gdf'] = joined_gdf
+                st.session_state['polygon_gdf'] = polygon_gdf
 
-        st.session_state['joined_gdf'] = joined_gdf
-        st.session_state['polygon_gdf'] = polygon_gdf
+                current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+                processing_date = current_time.strftime('%Y%m%d')
+                st.session_state['processing_date'] = processing_date
 
-        current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-        processing_date = current_time.strftime('%Y%m%d')
-        st.session_state['processing_date'] = processing_date
-
-        st.session_state['data_ready'] = True
+                st.session_state['data_ready'] = True
+            else:
+                st.error(translations[language]["error_display_pdf"].format(error="No 'features' in ArcGIS REST response."))
+        else:
+            st.error(translations[language]["error_display_pdf"].format(error=f"ArcGIS REST query failed with status code {response.status_code}"))
 
         progress_text.empty()
         progress_bar.empty()
@@ -495,8 +563,12 @@ def display_map_with_results():
 
     folium.LayerControl().add_to(m)
 
-    bounds = joined_gdf.total_bounds
-    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+    if not joined_gdf.empty:
+        bounds = joined_gdf.total_bounds
+        m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+    elif not polygon_gdf.empty:
+        bounds = polygon_gdf.total_bounds
+        m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
 
     st_folium(m, width=700, height=500, key='result_map')
 
