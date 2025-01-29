@@ -382,26 +382,29 @@ def process_polygon(polygon_gdf, input_method):
 
         ### JAUNUMS: Iegūstam lietotāja ievadīto kadastra numuru (code) ###
         search_code = st.session_state.get('search_code', '').strip()
-        if search_code:
-            # Ja ievadīts kods, liekam to 'where' izteiksmē
-            where_clause = f"code='{search_code}'"
-        else:
-            # Pretējā gadījumā atstājam noklusēto
-            where_clause = "1=1"
-        ### /JAUNUMS ###
-
-        # ArcGIS vaicājuma parametri
-        params = {
-            'f': 'json',
-            'where': where_clause,   # <-- Izmantojam atjaunoto WHERE nosacījumu
-            'outFields': '*',
-            'returnGeometry': 'true',
-            'geometry': f'{minx},{miny},{maxx},{maxy}',
-            'geometryType': 'esriGeometryEnvelope',
-            'inSR': '3059',
-            'outSR': '3059',
-            'spatialRel': 'esriSpatialRelIntersects',
-        }
+if search_code:
+    # ja ievadīts code, neizmantojam bbox
+    params = {
+        'f': 'json',
+        'where': f"code='{search_code}'",
+        'outFields': '*',
+        'returnGeometry': 'true',
+        'outSR': '3059',
+    }
+else:
+    # ja code nav ievadīts, izmantojam poligona bbox
+    minx, miny, maxx, maxy = polygon_gdf.total_bounds
+    params = {
+        'f': 'json',
+        'where': '1=1',
+        'outFields': '*',
+        'returnGeometry': 'true',
+        'geometry': f'{minx},{miny},{maxx},{maxy}',
+        'geometryType': 'esriGeometryEnvelope',
+        'inSR': '3059',
+        'outSR': '3059',
+        'spatialRel': 'esriSpatialRelIntersects',
+    }
 
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(30)
