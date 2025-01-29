@@ -1,58 +1,49 @@
-import requests
 import streamlit as st
+import requests
 
-st.title("Adrešu meklēšana")
+st.title("Adrešu meklēšana ar Nominatim (piemērs)")
 
 def nominatim_search(query):
-    """Atgriež Nominatim rezultātu sarakstu (label, lat, lon) pēc dotā query."""
+    """
+    Atgriež Nominatim rezultātu sarakstu (label, lat, lon) pēc dotā query.
+    Pievērš uzmanību pareizai "User-Agent" galvenes norādei!
+    """
     url = "https://nominatim.openstreetmap.org/search"
     params = {
         "format": "json",
-        "limit": 5,  # cik ieteikumus atgriezt
+        "limit": 5,
         "q": query
     }
+    # OBLIGĀTI norādām lietotāja aģentu, citādi Nominatim var bloķēt pieprasījumu
+    headers = {
+        "User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"  
+    }
     try:
-        r = requests.get(url, params=params)
-        results = r.json()
-        out = []
-        for item in results:
-            label = item["display_name"]
-            lat = float(item["lat"])
-            lon = float(item["lon"])
-            out.append((label, lat, lon))
-        return out
-    except:
+        r = requests.get(url, params=params, headers=headers, timeout=10)
+        r.raise_for_status()  # pacelt kļūdu, ja nav 200
+        data = r.json()
+        results = []
+        for item in data:
+            label = item.get("display_name")
+            lat = float(item.get("lat"))
+            lon = float(item.get("lon"))
+            results.append((label, lat, lon))
+        return results
+    except Exception as e:
+        st.warning(f"Kļūda meklēšanā: {e}")
         return []
 
-def on_text_change():
-    query = st.session_state.address_text.strip()
-    if not query:
-        st.session_state.suggestions = []
-        return
-    suggestions = nominatim_search(query)
-    st.session_state.suggestions = suggestions
-
-# sagatavojam mainīgos, lai saglabātu starprezultātus
-if "address_text" not in st.session_state:
-    st.session_state.address_text = ""
-if "suggestions" not in st.session_state:
-    st.session_state.suggestions = []
-
-# Teksta ievade ar on_change
-st.text_input(
-    "Ievadiet adresi",
-    key="address_text",
-    on_change=on_text_change
-)
-
-# Parādām selectbox ar ieteikumiem
-if st.session_state.suggestions:
-    # veidojam label sarakstu (lai selectbox redz tikai tekstu)
-    select_labels = [x[0] for x in st.session_state.suggestions]
-    choice = st.selectbox("Ieteikumi:", select_labels)
-    st.write(f"**Jūsu izvēle**: {choice}")
-
-    # atrod lat/lon
-    chosen_item = next((x for x in st.session_state.suggestions if x[0] == choice), None)
-    if chosen_item:
-        st.write(f"Platums (lat): {chosen_item[1]}, Garums (lon): {chosen_item[2]}")
+# Teksta ievade un poga
+address = st.text_input("Ievadiet vietas nosaukumu (piem., 'Talsi'):")
+if st.button("Meklēt"):
+    if address.strip():
+        # Veicam meklēšanu
+        suggestions = nominatim_search(address.strip())
+        if suggestions:
+            st.write("Rezultāti:")
+            for (label, lat, lon) in suggestions:
+                st.write(f"**{label}**  [lat={lat}, lon={lon}]")
+        else:
+            st.write("Nekas netika atrasts.")
+    else:
+        st.warning("Ievadiet kādu atslēgvārdu!")
