@@ -64,7 +64,10 @@ translations = {
         "preparing_dxf": "3. Sagatavo DXF failu...",
         "preparing_csv": "4. Sagatavo CSV failu...",
         "warning_code_missing": 'Kolonna "code" nav pieejama datos. Teksts netiks pievienots DXF failā.',
-        "instructions": "Instrukcija"
+        "instructions": "Instrukcija",
+        "search_address": "Meklēt adresi",
+        "search_button": "Meklēt",
+        "search_error": "Neizdevās atrast adresi.",
     },
     "English": {
         "radio_label": "Choose the way to get data:",
@@ -97,7 +100,10 @@ translations = {
         "preparing_dxf": "3. Preparing DXF file...",
         "preparing_csv": "4. Preparing CSV file...",
         "warning_code_missing": '"code" column is not available in the data. Text will not be added to the DXF file.',
-        "instructions": "Instructions"
+        "instructions": "Instructions",
+        "search_address": "Search address",
+        "search_button": "Search",
+        "search_error": "Could not find the address.",
     }
 }
 
@@ -505,7 +511,7 @@ def display_map_with_results():
     st_folium(m, width=700, height=500, key='result_map')
 
 
-# --- Lejupielādes pogas (ar divām CSV versijām) ---
+# --- Lejupielādes pogas (ar papildu CSV un Excel) ---
 def display_download_buttons():
     if st.session_state.get('joined_gdf') is None or st.session_state['joined_gdf'].empty:
         st.error(translations[language]["error_no_data_download"])
@@ -520,7 +526,7 @@ def display_download_buttons():
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
 
-        # Tagad mums būs 6 soļi (5 agrākie + 1 Excel)
+        # 6 soļi: GeoJSON, Shapefile, DXF, CSV (code), CSV (visi lauki), Excel (visi lauki)
         total_steps = 6
         current_step = 0
 
@@ -782,6 +788,27 @@ def display_download_buttons():
         progress_bar.empty()
 
 
+# =================================================================
+#  GEOKODĒŠANA (adreses meklēšanas funkcija, izmantojot Nominatim)
+# =================================================================
+def geocode_address(address_text):
+    """
+    Izmanto OpenStreetMap Nominatim API, lai ģeokodētu (atrastu koordinātes) pēc adreses.
+    Ja veicās, atgriež (lat, lon), citādi atgriež (None, None).
+    """
+    if not address_text:
+        return None, None
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={address_text}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]['lat']), float(data[0]['lon'])
+    except:
+        pass
+    return None, None
+
 
 # --- Galvenā lietotnes saskarne ---
 def show_main_app():
@@ -912,16 +939,41 @@ def show_main_app():
     else:
         st.info(translations[language]["draw_instruction"])
 
-        wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
-        wms_layers = {
-            'Ortofoto': {'layers': 'public:Orto_LKS'},
-            'Kadastra karte': {'layers': 'publicwfs:Kadastra_karte'}
-        }
+        # Iegaumējam un atjaunojam kartes centru, ja jau meklēts
+        if 'map_center' not in st.session_state:
+            st.session_state['map_center'] = [56.946285, 24.105078]
 
+        # Adreses meklēšana un kartes centra atjaunošana
         with st.form(key='draw_form'):
-            m = folium.Map(location=default_location, zoom_start=10)
+            # Adreses ievade
+            address_text = st.text_input(
+                label=translations[language]["search_address"],
+                value="",  # tukšs sākotnēji
+            )
+            # Pogas - meklēšanas un "Iegūt datus"
+            search_col, data_col = st.columns([1,1])
+            with search_col:
+                search_button = st.form_submit_button(label=translations[language]["search_button"])
+            with data_col:
+                submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
+
+            # Ja nospiesta meklēšanas poga
+            if search_button and address_text.strip():
+                lat, lon = geocode_address(address_text.strip())
+                if lat is not None and lon is not None:
+                    st.session_state['map_center'] = [lat, lon]
+                else:
+                    st.warning(translations[language]["search_error"])
+
+            # Izveidojam karti ar aktualizētu centru
+            m = folium.Map(location=st.session_state['map_center'], zoom_start=10)
 
             # Papildu WMS slāņi
+            wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
+            wms_layers = {
+                'Ortofoto': {'layers': 'public:Orto_LKS'},
+                'Kadastra karte': {'layers': 'publicwfs:Kadastra_karte'}
+            }
             add_wms_layer(
                 map_obj=m,
                 url=wms_url,
@@ -939,6 +991,7 @@ def show_main_app():
                 opacity=0.5
             )
 
+            # Zīmēšanas rīks
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
 
@@ -962,9 +1015,10 @@ def show_main_app():
             folium.LayerControl().add_to(m)
             m.get_root().add_child(CustomDeleteButton())
 
+            # Izvadām karti
             output = st_folium(m, width=700, height=500, key='draw_map')
-            submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
 
+            # Ja nospiesta poga "Iegūt datus"
             if submit_button:
                 if output and 'all_drawings' in output and output['all_drawings']:
                     last_drawing = output['all_drawings'][-1]
