@@ -8,3 +8,4 @@ fiona
 ezdxf
 pandas
 requests
+arcgis2geojson
