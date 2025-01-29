@@ -421,10 +421,6 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
 #  Apstrādā poligonu (ArcGIS FeatureServer)
 # =============================================================================
 def process_polygon(polygon_gdf, input_method):
-    """
-    Sagatavo poligonu (EPSG:3059), nosūta bounding-box vaicājumu ArcGIS FeatureServer,
-    atlasot Kadastra datus, un saglabā 'joined_gdf' un 'polygon_gdf' SessionState.
-    """
     try:
         progress_bar = st.progress(0)
         progress_text = st.empty()
@@ -432,22 +428,18 @@ def process_polygon(polygon_gdf, input_method):
         st.session_state['input_method'] = input_method
         progress_text.text(translations[language].get("preparing_geojson", "1. Preparing GeoJSON file..."))
 
-        # ArcGIS FeatureServer bāzes URL (slānis #8)
         arcgis_url_base = (
             "https://utility.arcgis.com/usrsvcs/servers/"
             "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
             "Kadastrs/FeatureServer/8/query"
         )
 
-        # Pārliekam lietotāja poligonu uz EPSG:3059
         polygon_gdf = polygon_gdf.to_crs(epsg=3059)
         progress_bar.progress(10)
 
-        # Bounding box
         minx, miny, maxx, maxy = polygon_gdf.total_bounds
         progress_bar.progress(20)
 
-        # ArcGIS vaicājuma parametri
         params = {
             'f': 'json',
             'where': '1=1',
@@ -463,7 +455,6 @@ def process_polygon(polygon_gdf, input_method):
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(30)
 
-        # Lejupielādējam datus
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
@@ -473,7 +464,6 @@ def process_polygon(polygon_gdf, input_method):
         esri_data = resp.json()
         progress_bar.progress(50)
 
-        # Konvertējam ESRI JSON -> GeoJSON
         geojson_data = arcgis2geojson(esri_data)
         progress_bar.progress(60)
 
@@ -484,18 +474,15 @@ def process_polygon(polygon_gdf, input_method):
             arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
         progress_bar.progress(70)
 
-        # Sjoin, lai atlasītu tikai īsto pārklāšanos
         joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
         joined_gdf = joined_gdf.reset_index(drop=True).fillna('')
         progress_bar.progress(85)
 
-        # Pārveidojam kolonnas par string
         for col in joined_gdf.columns:
             if col != 'geometry':
                 if not pd.api.types.is_string_dtype(joined_gdf[col]):
                     joined_gdf[col] = joined_gdf[col].astype(str)
 
-        # Izlabojam ģeometrijas kļūdas (ja tādas ir)
         invalid_geometries = ~joined_gdf.is_valid
         if invalid_geometries.any():
             joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
@@ -820,25 +807,29 @@ def display_download_buttons():
 
 
 # =============================================================================
-#  Adreses meklēšana (Nominatim) + diagnostika
+#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu
 # =============================================================================
 def geocode_address(address_text):
+    """
+    Vaicā Nominatim ar parametru polygon_geojson=1, lai iegūtu
+    gan lat/lon, gan poligona robežu (ja pieejams).
+    Atgriež (lat, lon, polygon_geojson, bounding_box).
+    """
     if not address_text:
-        return None, None
+        return None, None, None, None
     try:
         url = "https://nominatim.openstreetmap.org/search"
         params = {
-            'format': 'json',
-            'q': address_text,
-            'limit': 5
+            "format": "json",
+            "q": address_text,
+            "limit": 5,
+            "polygon_geojson": 1  # Lai dabūtu robežu GeoJSON
         }
         headers = {
-            # User-Agent obligāts
-            'User-Agent': 'MyStreamlitApp/1.0 (myemail@domain.com)'
+            "User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"
         }
         r = requests.get(url, params=params, headers=headers, timeout=10)
 
-        # DIAGNOSTIKA
         st.write("DEBUG status code:", r.status_code)
         st.write("DEBUG text:", r.text)
 
@@ -847,12 +838,15 @@ def geocode_address(address_text):
         if data:
             lat = float(data[0]["lat"])
             lon = float(data[0]["lon"])
-            return lat, lon
+            # Poligona ģeometrija, ja pieejama
+            poly_geojson = data[0].get("geojson")  # dict vai None
+            bbox = data[0].get("boundingbox")      # [s,n,w,e]
+            return lat, lon, poly_geojson, bbox
         else:
-            return None, None
+            return None, None, None, None
     except Exception as e:
         st.warning(f"Kļūda meklēšanā: {e}")
-        return None, None
+        return None, None, None, None
 
 
 # =============================================================================
@@ -993,6 +987,10 @@ def show_main_app():
         # Saglabājam/atjaunojam kartes centru SessionState
         if 'map_center' not in st.session_state:
             st.session_state['map_center'] = [56.946285, 24.105078]
+        if 'found_geometry' not in st.session_state:
+            st.session_state['found_geometry'] = None
+        if 'found_bbox' not in st.session_state:
+            st.session_state['found_bbox'] = None
 
         with st.form(key='draw_form'):
             address_text = st.text_input(
@@ -1012,10 +1010,12 @@ def show_main_app():
 
             # Ja nospiesta poga "Meklēt"
             if search_button and address_text.strip():
-                lat, lon = geocode_address(address_text.strip())
+                lat, lon, poly_geojson, bbox = geocode_address(address_text.strip())
                 if lat is not None and lon is not None:
                     st.session_state['map_center'] = [lat, lon]
-                    st.write("Karte tiks centrēta:", st.session_state['map_center'])
+                    st.session_state['found_geometry'] = poly_geojson
+                    st.session_state['found_bbox'] = bbox
+                    st.write("Karte tiks centrēta uz:", st.session_state['map_center'])
                 else:
                     st.warning(translations[language]["search_error"])
 
@@ -1023,6 +1023,7 @@ def show_main_app():
             current_lat, current_lon = st.session_state['map_center']
             m = folium.Map(location=[current_lat, current_lon], zoom_start=10)
 
+            # Pievienojam WMS slāņus
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
             wms_layers = {
                 'Ortofoto': {'layers': 'public:Orto_LKS'},
@@ -1045,6 +1046,25 @@ def show_main_app():
                 opacity=0.5
             )
 
+            # Ja Nominatim atgriezis poligonu, to iezīmējam
+            if st.session_state["found_geometry"]:
+                folium.GeoJson(
+                    data=st.session_state["found_geometry"],
+                    name="Atrastais poligons (Nominatim)",
+                    style_function=lambda x: {"color": "green", "fillOpacity": 0.2}
+                ).add_to(m)
+
+            # Ja gribat automātiski fit-ot robežu, ja definēta boundingbox
+            if st.session_state["found_bbox"]:
+                s, n, w, e = st.session_state["found_bbox"]  # [s, n, w, e]
+                # Pārvēršam uz float un fit_bounds
+                try:
+                    s, n, w, e = map(float, [s, n, w, e])
+                    m.fit_bounds([[s, w], [n, e]])
+                except:
+                    pass
+
+            # Zīmēšanas rīks poligonam
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
 
@@ -1068,13 +1088,12 @@ def show_main_app():
             folium.LayerControl().add_to(m)
             m.get_root().add_child(CustomDeleteButton())
 
-            # **Dinamiska key** - lai piespiestu karti vienmēr "redraw"
-            map_key = f"draw_map_{current_lat:.6f}_{current_lon:.6f}"
+            # Dinamiska key, lai nodrošinātu, ka karte “atjaunojas”:
+            map_key = f"draw_map_{current_lat:.5f}_{current_lon:.5f}"
 
-            # Izvadām karti
             output = st_folium(m, width=700, height=500, key=map_key)
 
-            # Ja nospiesta poga "Iegūt datus"
+            # Ja nospiesta poga "Iegūt datus" (poligona apstrāde)
             if submit_button:
                 if output and 'all_drawings' in output and output['all_drawings']:
                     last_drawing = output['all_drawings'][-1]
