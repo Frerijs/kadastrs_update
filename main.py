@@ -252,6 +252,7 @@ def login():
         else:
             st.error(translations[language]["error_login"])
 
+
 def show_login():
     st.title(translations[language]["title"])
     with st.form(key='login_form'):
@@ -563,7 +564,7 @@ def display_download_buttons():
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
 
-        total_steps = 6
+        total_steps = 7  # <-- palielinām kopējo soļu skaitu, jo pievienosim jaunu 7. soli
         current_step = 0
 
         # 1) GEOJSON
@@ -622,7 +623,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 3) DXF
+        # 3) DXF (ar `code` lauku)
         try:
             progress_text.text(translations[language].get("preparing_dxf", "3. Sagatavo DXF failu..."))
             dxf_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.dxf')
@@ -798,6 +799,129 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(f"Kļūda sagatavojot XLSX failu: {str(e)}")
+
+        # ---------------------------------------------------------------------
+        # 7) PILNAIS DXF (ar visām kolonnām, tostarp ģeometriju WKT formātā)
+        # ---------------------------------------------------------------------
+        try:
+            progress_text.text("7. Sagatavo PILNO DXF failu (ar visām kolonnām)...")
+            full_dxf_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}_all_fields.dxf')
+            doc_all = ezdxf.new(dxfversion='R2010')
+            doc_all.encoding = 'utf-8'
+
+            # Jauni slāņi (lai atšķirtos no iepriekšējā)
+            if 'KKParcelAll' not in doc_all.layers:
+                doc_all.layers.new(name='KKParcelAll', dxfattribs={
+                    'color': 0,
+                    'linetype': 'Continuous',
+                    'true_color': 0x00FF00,  # zaļgana krāsa
+                    'lineweight': 1,
+                })
+
+            if 'KKParcelAll_txt' not in doc_all.layers:
+                doc_all.layers.new(name='KKParcelAll_txt', dxfattribs={
+                    'color': 0,
+                    'linetype': 'Continuous',
+                    'true_color': 0x00FF00,
+                    'lineweight': 1,
+                })
+
+            # Fonta stils (Tahoma)
+            if 'Tahoma' not in doc_all.styles:
+                try:
+                    doc_all.styles.new('Tahoma', dxfattribs={'font': 'Tahoma.ttf'})
+                except:
+                    st.error("Neizdevās reģistrēt fontu 'Tahoma' pilnajam DXF.")
+                    # Turpinām bez fonta, ja kas notiek
+
+            msp_all = doc_all.modelspace()
+
+            # Funkcija, kas no rindas sagatavo tekstu ar visām kolonnām (arī geometry -> WKT).
+            def get_full_info_text(row) -> str:
+                # Visas kolonnas ieliekam atsevišķās rindiņās.
+                # MText nodrošina \P kā rindas dalītāju.
+                lines = []
+                for col_name in row.index:
+                    # Minimāli aizstājam jaunās rindas ar \P, ja uzkrāsies
+                    val = str(row[col_name]).replace('\n', ' ')
+                    lines.append(f"{col_name}: {val}")
+                # Savienojam ar \P (DXF MText rindas dalītājs)
+                return "\\P".join(lines)
+
+            # Iezīmējam poligonu kontūras un pievienojam MText
+            for idx, row in joined_gdf.iterrows():
+                geom = row['geometry']
+                # Sagatavojam pilno tekstu
+                full_text = get_full_info_text(row)
+
+                if geom.type == 'Polygon':
+                    exterior_coords = list(geom.exterior.coords)
+                    msp_all.add_lwpolyline(exterior_coords, dxfattribs={
+                        'layer': 'KKParcelAll',
+                        'lineweight': 1,
+                    }, close=True)
+                    for interior in geom.interiors:
+                        interior_coords = list(interior.coords)
+                        msp_all.add_lwpolyline(interior_coords, dxfattribs={
+                            'layer': 'KKParcelAll',
+                            'lineweight': 1,
+                        }, close=True)
+                    rep_point = geom.representative_point()
+                    mtext = msp_all.add_mtext(
+                        full_text,
+                        dxfattribs={
+                            'insert': (rep_point.x, rep_point.y),
+                            'style': 'Tahoma',
+                            'layer': 'KKParcelAll_txt',
+                            'char_height': 1.0,
+                        }
+                    )
+                    # Lai teksta rindas atdalītos, noder iestatīt line_spacing_factor
+                    mtext.dxf.line_spacing_factor = 1.2
+
+                elif geom.type == 'MultiPolygon':
+                    for poly in geom.geoms:
+                        exterior_coords = list(poly.exterior.coords)
+                        msp_all.add_lwpolyline(exterior_coords, dxfattribs={
+                            'layer': 'KKParcelAll',
+                            'lineweight': 1,
+                        }, close=True)
+                        for interior in poly.interiors:
+                            interior_coords = list(interior.coords)
+                            msp_all.add_lwpolyline(interior_coords, dxfattribs={
+                                'layer': 'KKParcelAll',
+                                'lineweight': 1,
+                            }, close=True)
+                        rep_point = poly.representative_point()
+                        mtext = msp_all.add_mtext(
+                            full_text,
+                            dxfattribs={
+                                'insert': (rep_point.x, rep_point.y),
+                                'style': 'Tahoma',
+                                'layer': 'KKParcelAll_txt',
+                                'char_height': 1.0,
+                            }
+                        )
+                        mtext.dxf.line_spacing_factor = 1.2
+
+            doc_all.saveas(full_dxf_output_path)
+
+            # Sagatavojam lejupielādei
+            with open(full_dxf_output_path, 'rb') as f:
+                full_dxf_bytes = f.read()
+
+            st.download_button(
+                label="Lejupielādēt PILNOS datus DXF formātā",
+                data=full_dxf_bytes,
+                file_name=f"{file_name_prefix}_all_fields.dxf",
+                mime="application/dxf"
+            )
+
+            current_step += 1
+            progress_bar.progress(current_step / total_steps)
+
+        except Exception as e:
+            st.error(f"Kļūda sagatavojot PILNO DXF failu: {str(e)}")
 
         progress_text.empty()
         progress_bar.empty()
