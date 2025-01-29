@@ -19,12 +19,10 @@ from folium.plugins import Draw  # Importēt Draw spraudni
 from ezdxf.enums import TextHAlign  # Importēt TextHAlign teksta izlīdzināšanai
 from folium import MacroElement
 from jinja2 import Template
-import base64  # Imports PDF attēlošanai
+import base64  # PDF attēlošanai
+from arcgis2geojson import arcgis2geojson  # ArcGIS -> GeoJSON konvertēšana
 
-# *** Jaunais imports ArcGIS formāta konvertēšanai
-from arcgis2geojson import arcgis2geojson
-
-# Supabase konfigurācija (Aizvietojiet ar savām faktiskajām vērtībām)
+# Supabase konfigurācija (demonstrācijas vajadzībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
 supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVod2JmbHFkcmlwYXRmcGJiZXRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDcxODE2MywiZXhwIjoyMDQ2Mjk0MTYzfQ.78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"
 
@@ -103,10 +101,10 @@ translations = {
     }
 }
 
-# 1. Izsaucam st.set_page_config kā pirmo Streamlit komandu
+# 1. Streamlit lapas iestatījumi
 st.set_page_config(page_title=translations["Latviešu"]["title"], layout="centered")
 
-# 2. Pievienojam pielāgotu CSS, lai palielinātu radio pogu etiķetes
+# Palielinām radio pogu etiķetes fontu
 st.markdown(
     """
     <style>
@@ -119,14 +117,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Valodas izvēlne (Latviešu / Angļu)
+# Valodas izvēle
 language = st.sidebar.selectbox(translations["Latviešu"]["language_label"], ["Latviešu", "English"])
 
-# Definēt CustomDeleteButton klasi
+
+# Pielāgots Leaflet kontrolis (dzēš visus uzzīmētos poligonus)
 class CustomDeleteButton(MacroElement):
-    """
-    Pielāgots kontrolis ar atkritumu kastes ikonu, kas notīra visus uzzīmētos poligonus.
-    """
     _template = Template("""
         {% macro script(this, kwargs) %}
             L.Control.DeleteButton = L.Control.extend({
@@ -166,7 +162,8 @@ class CustomDeleteButton(MacroElement):
     def __init__(self):
         super().__init__()
 
-# Funkcija lietotāja autentifikācijai
+
+# --- Funkcijas lietotāja pieteikšanai ar Supabase (pēc vajadzības) ---
 def authenticate(username, password):
     try:
         headers = {
@@ -194,7 +191,6 @@ def authenticate(username, password):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
         return False
 
-# Funkcija lietotāja pieteikšanās reģistrēšanai
 def log_user_login(username):
     try:
         riga_tz = ZoneInfo('Europe/Riga')
@@ -218,7 +214,8 @@ def log_user_login(username):
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-# Callback funkcija pieteikšanās formai
+
+# --- Pieteikšanās forma (ja nepieciešams) ---
 def login():
     username = st.session_state.get('username', '').strip()
     password = st.session_state.get('password', '').strip()
@@ -229,12 +226,10 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username_logged = username
             log_user_login(username)
-            # Noklusējuma izvēle pēc pieteikšanās
             st.session_state['input_option'] = translations[language]["methods"][1]
         else:
             st.error(translations[language]["error_login"])
 
-# Funkcija, lai parādītu pieteikšanās formu
 def show_login():
     st.title(translations[language]["title"])
     with st.form(key='login_form'):
@@ -243,7 +238,8 @@ def show_login():
         submit_button = st.form_submit_button(label=("Pieslēgties" if language=="Latviešu" else "Login"), on_click=login)
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
-# Funkcija PDF attēlošanai
+
+# --- Funkcija PDF failu attēlošanai (pēc vajadzības) ---
 def display_pdf(file_path):
     try:
         with open(file_path, "rb") as f:
@@ -260,37 +256,8 @@ def display_pdf(file_path):
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-# Funkcija PDF instrukcijas lejupielādei vai attēlošanai
-def display_instruction():
-    direct_pdf_url = "https://drive.google.com/uc?export=download&id=1jUh4Uq9svZsnAWCkN6VQHW1C0kp1wLws"
-    try:
-        response = requests.get(direct_pdf_url)
-        if response.status_code == 200:
-            pdf_bytes = response.content
-            st.download_button(
-                label=translations[language]["download_geojson"],
-                data=pdf_bytes,
-                file_name=("Kadastra_instrukcija.pdf" if language=="Latviešu" else "Cadastral_instructions.pdf"),
-                mime="application/pdf"
-            )
-            
-            st.markdown("---")
-            
-            if st.button(translations[language]["instructions"]):
-                base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-                pdf_display = f'''
-                    <iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf">
-                        <p>{translations[language]["error_display_pdf"].format(error="")} 
-                        <a href="data:application/pdf;base64,{base64_pdf}">{translations[language]["download_dxf"]}</a>.</p>
-                    </iframe>
-                '''
-                st.markdown(pdf_display, unsafe_allow_html=True)
-        else:
-            st.error(translations[language]["error_display_pdf"].format(error="Failed to download PDF from Google Drive."))
-    except Exception as e:
-        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-# DXF -> GeoDataFrame
+# --- DXF -> GeoDataFrame ---
 def read_dxf_to_geodataframe(dxf_file_path):
     try:
         doc = ezdxf.readfile(dxf_file_path)
@@ -312,12 +279,14 @@ def read_dxf_to_geodataframe(dxf_file_path):
                     to_2d((end.x, end.y, end.z))
                 ])
                 geometries.append(line)
+
             elif entity.dxftype() == 'LWPOLYLINE':
                 points = [to_2d(point) for point in entity.get_points()]
                 if entity.closed:
                     geometries.append(Polygon(points))
                 else:
                     geometries.append(LineString(points))
+
             elif entity.dxftype() == 'POLYLINE':
                 points = []
                 for vertex in entity.vertices:
@@ -327,11 +296,13 @@ def read_dxf_to_geodataframe(dxf_file_path):
                     geometries.append(Polygon(points))
                 else:
                     geometries.append(LineString(points))
+
             elif entity.dxftype() == 'CIRCLE':
                 center = to_2d((entity.dxf.center.x, entity.dxf.center.y, entity.dxf.center.z))
                 radius = entity.dxf.radius
                 circle = Point(center).buffer(radius)
                 geometries.append(circle)
+
             elif entity.dxftype() == 'ARC':
                 center = entity.dxf.center
                 radius = entity.dxf.radius
@@ -344,6 +315,7 @@ def read_dxf_to_geodataframe(dxf_file_path):
                     for angle in theta
                 ]
                 geometries.append(LineString(arc_points))
+
             elif entity.dxftype() == '3DFACE':
                 vertices = [
                     (entity.dxf.vtx0.x, entity.dxf.vtx0.y, entity.dxf.vtx0.z),
@@ -355,14 +327,13 @@ def read_dxf_to_geodataframe(dxf_file_path):
                 vertices_2d = to_2d(vertices)
                 geometries.append(Polygon(vertices_2d))
 
-        # Papildu solis: mēģinām uzģenerēt poligonus no līnijām
+        # Mēģinām apvienot lineārās ģeometrijas poligonos
         lines = [geom for geom in geometries if isinstance(geom, LineString)]
         if lines:
             multiline = linemerge(lines)
             polygons = list(polygonize(multiline))
             geometries.extend(polygons)
 
-        # Apvienojam poligonus vienā
         polygons = [geom for geom in geometries if isinstance(geom, (Polygon, MultiPolygon))]
         if polygons:
             unified_geometry = unary_union(polygons)
@@ -379,6 +350,8 @@ def read_dxf_to_geodataframe(dxf_file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
         return gpd.GeoDataFrame()
 
+
+# --- WMS slāņa pievienošana kartē ---
 def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
     try:
         folium.WmsTileLayer(
@@ -395,12 +368,9 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
     except Exception as e:
         st.error((f"Neizdevās pievienot {name} slāni: {e}" if language=="Latviešu" else f"Failed to add {name} layer: {e}"))
 
-# *** TE GALVENAIS: AIZSTĀJAM WFS AR ArcGIS FeatureServer *** 
+
+# --- Galvenā funkcija poligona apstrādei (ArcGIS FeatureServer) ---
 def process_polygon(polygon_gdf, input_method):
-    """
-    Apstrādā lietotāja poligonu, veic ArcGIS FeatureServer vaicājumu,
-    saskaita pārklāšanās un saglabā GeoDataFrame sesijā.
-    """
     try:
         progress_bar = st.progress(0)
         progress_text = st.empty()
@@ -408,22 +378,22 @@ def process_polygon(polygon_gdf, input_method):
         st.session_state['input_method'] = input_method
         progress_text.text(translations[language].get("preparing_geojson", "1. Preparing GeoJSON file..."))
 
-        # ArcGIS FeatureServer slāņa URL (8 = slāņa indekss)
+        # ArcGIS FeatureServer bāzes URL (slānis #8)
         arcgis_url_base = (
             "https://utility.arcgis.com/usrsvcs/servers/"
             "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
             "Kadastrs/FeatureServer/8/query"
         )
 
-        # Pārliecināmies, ka poligons ir EPSG:3059 (LKS-92)
+        # Pārliekam lietotāja poligonu uz EPSG:3059
         polygon_gdf = polygon_gdf.to_crs(epsg=3059)
         progress_bar.progress(10)
 
-        # Aprēķinām bounding box
+        # Bounding box
         minx, miny, maxx, maxy = polygon_gdf.total_bounds
         progress_bar.progress(20)
 
-        # Sagatavojam ArcGIS query parametrus (ESRI JSON atbilde)
+        # ArcGIS vaicājuma parametri
         params = {
             'f': 'json',
             'where': '1=1',
@@ -436,52 +406,47 @@ def process_polygon(polygon_gdf, input_method):
             'spatialRel': 'esriSpatialRelIntersects',
         }
 
-        # Veidojam pilno URL ar parametriem
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(30)
 
-        # 1) Pieprasām datus no ArcGIS FeatureServer
+        # Lejupielādējam datus
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
             return
         progress_bar.progress(40)
 
-        # 2) ESRI JSON -> Python dict
         esri_data = resp.json()
         progress_bar.progress(50)
 
-        # 3) Konvertējam ESRI JSON -> GeoJSON dict
+        # Konvertējam ESRI JSON -> GeoJSON
         geojson_data = arcgis2geojson(esri_data)
         progress_bar.progress(60)
 
-        # 4) Izveidojam GeoDataFrame no GeoJSON features
         arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-        # Ja serveris neatgriež CRS, norādām to paši
         if arcgis_gdf.crs is None:
             arcgis_gdf.crs = "EPSG:3059"
         else:
             arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
         progress_bar.progress(70)
 
-        # 5) Tagad “sjoin” ar lietotāja poligonu, lai izfiltrētu precīzas pārklāšanās
+        # Sjoin, lai atlasītu tikai īsto pārklāšanos
         joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
         joined_gdf = joined_gdf.reset_index(drop=True).fillna('')
         progress_bar.progress(85)
 
-        # Pārliecināmies, ka visas kolonnas ir string (izņemot geometry)
+        # Pārveidojam kolonnas par string (ja nepieciešams)
         for col in joined_gdf.columns:
             if col != 'geometry':
                 if not pd.api.types.is_string_dtype(joined_gdf[col]):
                     joined_gdf[col] = joined_gdf[col].astype(str)
 
-        # Izlabojam iespējamas ģeometrijas kļūdas
+        # Izlabojam ģeometrijas kļūdas (ja tādas ir)
         invalid_geometries = ~joined_gdf.is_valid
         if invalid_geometries.any():
             joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
         progress_bar.progress(95)
 
-        # Saglabājam rezultātu sesijā
         st.session_state['joined_gdf'] = joined_gdf
         st.session_state['polygon_gdf'] = polygon_gdf
 
@@ -496,7 +461,8 @@ def process_polygon(polygon_gdf, input_method):
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-# Attēlojam kartē rezultātus
+
+# --- Attēlot rezultātus uz kartes ---
 def display_map_with_results():
     joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
     polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
@@ -533,21 +499,19 @@ def display_map_with_results():
         ).add_to(m)
 
     folium.LayerControl().add_to(m)
-
-    # Zoom uz rezultātiem
     bounds = joined_gdf.total_bounds
     m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
 
     st_folium(m, width=700, height=500, key='result_map')
 
-# Lejupielādes pogas
+
+# --- Lejupielādes pogas (ar divām CSV versijām) ---
 def display_download_buttons():
     if st.session_state.get('joined_gdf') is None or st.session_state['joined_gdf'].empty:
         st.error(translations[language]["error_no_data_download"])
         return
 
     joined_gdf = st.session_state['joined_gdf']
-
     with tempfile.TemporaryDirectory() as tmp_output_dir:
         progress_bar = st.progress(0)
         progress_text = st.empty()
@@ -556,12 +520,13 @@ def display_download_buttons():
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
 
-        total_steps = 4
+        # Palielinām soļu skaitu uz 5, jo pievienosim otru CSV
+        total_steps = 5
         current_step = 0
 
-        # --- 1) GeoJSON
+        # 1) GeoJSON
         try:
-            progress_text.text(translations[language].get("preparing_geojson", "1. Preparing GeoJSON file..."))
+            progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
             geojson_str = joined_gdf.to_json()
             if not geojson_str:
                 st.error(translations[language]["error_display_pdf"].format(error="Failed to generate GeoJSON data."))
@@ -578,7 +543,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # --- 2) Shapefile (iepako .zip)
+        # 2) Shapefile (ZIP)
         try:
             progress_text.text(translations[language].get("preparing_shapefile", "2. Sagatavo Shapefile ZIP failu..."))
             shp_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.shp')
@@ -615,7 +580,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # --- 3) DXF
+        # 3) DXF
         try:
             progress_text.text(translations[language].get("preparing_dxf", "3. Sagatavo DXF failu..."))
             dxf_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.dxf')
@@ -723,7 +688,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # --- 4) CSV
+        # 4) CSV (tikai 'code')
         try:
             progress_text.text(translations[language].get("preparing_csv", "4. Sagatavo CSV failu..."))
             if 'code' in joined_gdf.columns:
@@ -747,9 +712,33 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
+        # 5) CSV ar visiem laukiem (geometry -> WKT)
+        try:
+            progress_text.text("5. Sagatavo CSV failu ar visiem laukiem...")
+            all_data_df = joined_gdf.copy()
+            # Konvertējam geometries uz WKT string
+            all_data_df['geometry'] = all_data_df['geometry'].apply(lambda g: g.wkt if g else None)
+            csv_str_all = all_data_df.to_csv(index=False, encoding='utf-8')
+            if not csv_str_all:
+                st.error("Neizdevās ģenerēt pilno CSV.")
+            else:
+                csv_bytes_all = csv_str_all.encode('utf-8')
+                st.download_button(
+                    label="Lejupielādēt VISUS datus CSV formātā",
+                    data=csv_bytes_all,
+                    file_name=f'{file_name_prefix}_all.csv',
+                    mime='text/csv'
+                )
+            current_step += 1
+            progress_bar.progress(current_step / total_steps)
+        except Exception as e:
+            st.error(f"Kļūda sagatavojot visus datus CSV formātā: {str(e)}")
+
         progress_text.empty()
         progress_bar.empty()
 
+
+# --- Galvenā lietotnes saskarne ---
 def show_main_app():
     direct_pdf_url = "https://drive.google.com/uc?export=download&id=1jUh4Uq9svZsnAWCkN6VQHW1C0kp1wLws"
     col1, col2 = st.columns([3, 1])
@@ -766,30 +755,28 @@ def show_main_app():
         )
 
     st.title(translations[language]["title"])
-
     default_location = [56.946285, 24.105078]
 
-    # Radio pogas: kā ievadīt poligonu
     radio_label = translations[language]["radio_label"]
     methods = translations[language]["methods"]
 
-    # Noklusējuma vērtības
     if 'input_option' not in st.session_state:
-        st.session_state['input_option'] = methods[1]  # “Zīmējiet uz kartes...”
+        st.session_state['input_option'] = methods[1]
     if 'previous_option' not in st.session_state:
         st.session_state['previous_option'] = methods[1]
 
-    # Ievades metodes radio
     input_option = st.radio(
         label=radio_label,
         options=methods,
         index=1 if st.session_state['input_option'] == methods[1] else 0
     )
 
-    # Ja atšķiras no iepriekšējās, notīrām starpstadijas
+    # Ja mainās ievades metode, notīrām starpstadijas
     if st.session_state['previous_option'] != input_option:
-        keys_to_reset = ['joined_gdf', 'polygon_gdf', 'data_ready',
-                         'base_file_name', 'processing_date', 'input_method']
+        keys_to_reset = [
+            'joined_gdf', 'polygon_gdf', 'data_ready',
+            'base_file_name', 'processing_date', 'input_method'
+        ]
         for key in keys_to_reset:
             if key in st.session_state:
                 del st.session_state[key]
@@ -797,10 +784,9 @@ def show_main_app():
 
     st.session_state['input_option'] = input_option
 
-    # 1) Augšupielādes metode
+    # 1) Augšupielādēts SHP/DXF
     if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
-
         st.markdown(
             f"""
             {translations[language]["upload_instruction"]}  
@@ -822,7 +808,7 @@ def show_main_app():
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
 
-                # Pārbaudām, vai ir .dxf
+                # Vai ir .dxf?
                 dxf_files = [
                     os.path.join(tmpdirname, f.name)
                     for f in uploaded_files if f.name.lower().endswith('.dxf')
@@ -834,16 +820,13 @@ def show_main_app():
                         st.error(translations[language]["error_upload_dxf"])
                         polygon_gdf = None
                     else:
-                        base_file_name = os.path.splitext(
-                            os.path.basename(dxf_files[0])
-                        )[0]
+                        base_file_name = os.path.splitext(os.path.basename(dxf_files[0]))[0]
                         st.session_state['base_file_name'] = base_file_name
                 else:
-                    # Ja nav dxf, tad skatāmies, vai ir shp
+                    # Pretējā gadījumā vai ir visas SHP sastāvdaļas?
                     required_extensions = ['.shp', '.shx', '.dbf']
                     uploaded_extensions = [
-                        os.path.splitext(f.name)[1].lower()
-                        for f in uploaded_files
+                        os.path.splitext(f.name)[1].lower() for f in uploaded_files
                     ]
                     if all(ext in uploaded_extensions for ext in required_extensions):
                         shp_files = [
@@ -859,11 +842,9 @@ def show_main_app():
                             st.error(translations[language]["error_upload_shp"])
                             polygon_gdf = None
                     else:
-                        st.error(
-                            translations[language]["error_display_pdf"].format(
-                                error="Please upload the polygon in one of the selected file formats: DXF or SHP."
-                            )
-                        )
+                        st.error(translations[language]["error_display_pdf"].format(
+                            error="Please upload the polygon in one of the selected file formats: DXF or SHP."
+                        ))
                         polygon_gdf = None
 
             if 'polygon_gdf' in locals() and polygon_gdf is not None:
@@ -882,7 +863,7 @@ def show_main_app():
             with st.empty():
                 st_folium(m, width=700, height=500, key='upload_map')
 
-    # 2) Zīmēšana uz kartes
+    # 2) Zīmēt poligonu uz kartes
     else:
         st.info(translations[language]["draw_instruction"])
 
@@ -895,7 +876,7 @@ def show_main_app():
         with st.form(key='draw_form'):
             m = folium.Map(location=default_location, zoom_start=10)
 
-            # Papildu WMS slāņi (ja vēlaties)
+            # Papildu WMS slāņi
             add_wms_layer(
                 map_obj=m,
                 url=wms_url,
@@ -942,20 +923,19 @@ def show_main_app():
             if submit_button:
                 if output and 'all_drawings' in output and output['all_drawings']:
                     last_drawing = output['all_drawings'][-1]
-                    polygon_gdf = gpd.GeoDataFrame.from_features(
-                        [last_drawing], crs='EPSG:4326'
-                    )
+                    polygon_gdf = gpd.GeoDataFrame.from_features([last_drawing], crs='EPSG:4326')
                     process_polygon(polygon_gdf, input_method='drawn')
                     st.session_state['data_ready'] = True
                     st.session_state['base_file_name'] = 'polygon'
                 else:
                     st.error(translations[language]["info_draw"])
 
-    # Ja dati ir sagatavoti, parādām karti un lejupielādes pogas
+    # Ja dati apstrādāti, rādam rezultātus un lejupielādes
     if st.session_state.get('data_ready', False):
         display_map_with_results()
         display_download_buttons()
 
+    # Poga Iziet
     if st.button(translations[language]["logout"]):
         st.session_state.clear()
         st.success(translations[language]["success_logout"])
@@ -965,15 +945,19 @@ def show_main_app():
         unsafe_allow_html=True
     )
 
+
 def main():
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
     if 'username_logged' not in st.session_state:
         st.session_state.username_logged = ''
+
+    # Pieteikšanās
     if not st.session_state.logged_in:
         show_login()
     else:
         show_main_app()
+
 
 if __name__ == '__main__':
     main()
