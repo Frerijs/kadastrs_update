@@ -520,11 +520,13 @@ def display_download_buttons():
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
 
-        # Palielinām soļu skaitu uz 5, jo pievienosim otru CSV
-        total_steps = 5
+        # Tagad mums būs 6 soļi (5 agrākie + 1 Excel)
+        total_steps = 6
         current_step = 0
 
-        # 1) GeoJSON
+        # ------------------
+        # 1) GEOJSON
+        # ------------------
         try:
             progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
             geojson_str = joined_gdf.to_json()
@@ -543,7 +545,9 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 2) Shapefile (ZIP)
+        # ------------------
+        # 2) SHAPEFILE (ZIP)
+        # ------------------
         try:
             progress_text.text(translations[language].get("preparing_shapefile", "2. Sagatavo Shapefile ZIP failu..."))
             shp_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.shp')
@@ -580,7 +584,9 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
+        # ------------------
         # 3) DXF
+        # ------------------
         try:
             progress_text.text(translations[language].get("preparing_dxf", "3. Sagatavo DXF failu..."))
             dxf_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.dxf')
@@ -688,7 +694,9 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 4) CSV (tikai 'code')
+        # ------------------
+        # 4) CSV (tikai code)
+        # ------------------
         try:
             progress_text.text(translations[language].get("preparing_csv", "4. Sagatavo CSV failu..."))
             if 'code' in joined_gdf.columns:
@@ -712,11 +720,12 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 5) CSV ar visiem laukiem (geometry -> WKT)
+        # ------------------
+        # 5) CSV ar visiem laukiem
+        # ------------------
         try:
             progress_text.text("5. Sagatavo CSV failu ar visiem laukiem...")
             all_data_df = joined_gdf.copy()
-            # Konvertējam geometries uz WKT string
             all_data_df['geometry'] = all_data_df['geometry'].apply(lambda g: g.wkt if g else None)
             csv_str_all = all_data_df.to_csv(index=False, encoding='utf-8')
             if not csv_str_all:
@@ -734,8 +743,44 @@ def display_download_buttons():
         except Exception as e:
             st.error(f"Kļūda sagatavojot visus datus CSV formātā: {str(e)}")
 
+        # ------------------
+        # 6) EXCEL ar visiem laukiem
+        # ------------------
+        try:
+            progress_text.text("6. Sagatavo EXCEL failu ar visiem laukiem...")
+
+            # Kopējam datus un konvertējam ģeometriju uz WKT
+            xls_data_df = joined_gdf.copy()
+            xls_data_df['geometry'] = xls_data_df['geometry'].apply(lambda g: g.wkt if g else None)
+
+            # Izveidojam pagaidu atmiņas buferi
+            import io
+            output_excel = io.BytesIO()
+
+            # Rakstām Excel formātā
+            with pd.ExcelWriter(output_excel, engine='xlsxwriter') as writer:
+                xls_data_df.to_excel(writer, sheet_name='VisiDati', index=False)
+
+            # Iegūstam bytes no bufera
+            excel_bytes = output_excel.getvalue()
+
+            # Pievienojam lejupielādes pogu
+            st.download_button(
+                label="Lejupielādēt VISUS datus EXCEL formātā",
+                data=excel_bytes,
+                file_name=f"{file_name_prefix}_all.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            current_step += 1
+            progress_bar.progress(current_step / total_steps)
+        except Exception as e:
+            st.error(f"Kļūda sagatavojot XLSX failu: {str(e)}")
+
+        # Noslēgumā
         progress_text.empty()
         progress_bar.empty()
+
 
 
 # --- Galvenā lietotnes saskarne ---
