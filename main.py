@@ -25,7 +25,8 @@ import io  # Excel rakstīšanai atmiņā
 
 # Supabase konfigurācija (ja lietojat Supabase autentifikācijai)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
-supabase_key = "..."  # Jūsu Supabase atslēga
+supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVod2JmbHFkcmlwYXRmcGJiZXRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDcxODE2MywiZXhwIjoyMDQ2Mjk0MTYzfQ.78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"  # Aizvietojiet ar drošu metodi
+
 
 # Konstantes
 APP_NAME = "Kadastrs"
