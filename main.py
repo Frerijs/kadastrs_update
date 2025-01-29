@@ -40,7 +40,9 @@ def get_data_by_code(search_code):
     Vienkāršota funkcija, kas meklē ArcGIS servisā pēc code='...'
     """
     if not search_code:
-        return gpd.GeoDataFrame()  # tukšs
+        return gpd.GeoDataFrame()  # ja tukšs, uzreiz atgriežam tukšu
+
+    # 1) Būvējam vaicājumu
     params = {
         'f': 'json',
         'where': f"code='{search_code}'",
@@ -49,15 +51,49 @@ def get_data_by_code(search_code):
         'outSR': '3059'
     }
     query_url = f"{ARCGIS_URL_BASE}?{urlencode(params)}"
+
+    # 2) Sūtot pieprasījumu ArcGIS servisam
     resp = requests.get(query_url)
+
+    # 3) Ja radās HTTP kļūda:
     if resp.status_code != 200:
         st.error(f"ArcGIS REST query failed: {resp.status_code}")
         return gpd.GeoDataFrame()
+
+    # 4) Iegūstam JSON no atbildes
     esri_data = resp.json()
+
+    # 5) Vai ir 'error' lauks atbildē (ArcGIS var atgriezt kļūdas ziņu)?
+    if "error" in esri_data:
+        msg = esri_data["error"].get("message", "Unknown ArcGIS error")
+        st.error(f"ArcGIS atgrieza kļūdu: {msg}")
+        return gpd.GeoDataFrame()
+
+    # 6) Konvertējam uz GeoJSON
     geojson_data = arcgis2geojson(esri_data)
+
+    # 7) Pārbaudām, vai geojson_data satur lauku "features"
+    if "features" not in geojson_data:
+        st.warning("ArcGIS neatgrieza nevienu ģeometriju (nav 'features').")
+        return gpd.GeoDataFrame()
+
+    # 8) Beidzot veidojam GeoDataFrame
     gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-    gdf.crs = "EPSG:3059"  # pieņemam, ka
+
+    # 9) Ja vajag, iestatām CRS
+    if gdf.empty:
+        # Ja ArcGIS kaut ko atgriezis, bet 0 objektus
+        st.warning(f"ArcGIS neatgrieza nevienu ierakstu atbilstoši code='{search_code}'.")
+        return gpd.GeoDataFrame()
+
+    # Pieņemam, ka orģināli EPSG:3059
+    if gdf.crs is None:
+        gdf.crs = "EPSG:3059"
+    else:
+        gdf = gdf.to_crs("EPSG:3059")
+
     return gdf
+
 
 def get_data_by_polygon(polygon_gdf):
     """
