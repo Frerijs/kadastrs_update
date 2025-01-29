@@ -112,7 +112,6 @@ translations = {
 }
 
 
-# 1. Streamlit lapas iestatījumi
 st.set_page_config(
     page_title=translations["Latviešu"]["title"],
     layout="centered"
@@ -131,16 +130,14 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Valodas izvēle
 language = st.sidebar.selectbox(
     translations["Latviešu"]["language_label"],
     ["Latviešu", "English"]
 )
 
-
-# ===========================
-#   PIELĀGOTS DZĒŠANAS RĪKS
-# ===========================
+# =============================================================================
+#  Pielāgots Leaflet kontrolis (dzēš poligonus)
+# =============================================================================
 class CustomDeleteButton(MacroElement):
     _template = Template("""
         {% macro script(this, kwargs) %}
@@ -181,9 +178,9 @@ class CustomDeleteButton(MacroElement):
         super().__init__()
 
 
-# ===========================
-#  AUTENTIFIKĀCIJA AR SUPABASE
-# ===========================
+# =============================================================================
+#  Lietotāja autentifikācija (Supabase DEMO)
+# =============================================================================
 def authenticate(username, password):
     try:
         headers = {
@@ -210,7 +207,6 @@ def authenticate(username, password):
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
         return False
-
 
 def log_user_login(username):
     try:
@@ -240,9 +236,6 @@ def log_user_login(username):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
 
-# ===========================
-#  PIETEIKŠANĀS
-# ===========================
 def login():
     username = st.session_state.get('username', '').strip()
     password = st.session_state.get('password', '').strip()
@@ -257,7 +250,6 @@ def login():
             st.session_state['input_option'] = translations[language]["methods"][1]
         else:
             st.error(translations[language]["error_login"])
-
 
 def show_login():
     st.title(translations[language]["title"])
@@ -280,9 +272,9 @@ def show_login():
     )
 
 
-# ===========================
-#  PDF PARĀDĪŠANA (ja vajadzīgs)
-# ===========================
+# =============================================================================
+# PDF attēlošanai (ja vajadzīgs)
+# =============================================================================
 def display_pdf(file_path):
     try:
         with open(file_path, "rb") as f:
@@ -302,9 +294,9 @@ def display_pdf(file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
 
-# ===========================
+# =============================================================================
 #  DXF -> GeoDataFrame
-# ===========================
+# =============================================================================
 def read_dxf_to_geodataframe(dxf_file_path):
     """
     Nolasa DXF failu, pārvērš to par GeoDataFrame (EPSG:3059).
@@ -402,13 +394,10 @@ def read_dxf_to_geodataframe(dxf_file_path):
         return gpd.GeoDataFrame()
 
 
-# ===========================
-#  WMS slāņa pievienošana
-# ===========================
+# =============================================================================
+#  WMS slāņa pievienošana Folium kartei
+# =============================================================================
 def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
-    """
-    Pievieno WMS slāni Folium kartei.
-    """
     try:
         folium.WmsTileLayer(
             url=url,
@@ -428,9 +417,9 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         )
 
 
-# ===========================
-#  Datu iegūšana no ArcGIS
-# ===========================
+# =============================================================================
+#  Apstrādā poligonu (ArcGIS FeatureServer)
+# =============================================================================
 def process_polygon(polygon_gdf, input_method):
     """
     Sagatavo poligonu (EPSG:3059), nosūta bounding-box vaicājumu ArcGIS FeatureServer,
@@ -527,14 +516,10 @@ def process_polygon(polygon_gdf, input_method):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
 
-# ===========================
-#  Attēlot rezultātu karti
-# ===========================
+# =============================================================================
+#  Attēlot kartē rezultātus (zilos poligonus) un ievadīto poligonu
+# =============================================================================
 def display_map_with_results():
-    """
-    Ja 'joined_gdf' ir dati, tos un poligonu parāda Folium kartē, 
-    iezīmējot poligonus zilā krāsā un sarkanu ievades poligonu.
-    """
     joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
     polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
     input_method = st.session_state.get('input_method', 'drawn')
@@ -577,13 +562,10 @@ def display_map_with_results():
     st_folium(m, width=700, height=500, key='result_map')
 
 
-# ===========================
+# =============================================================================
 #  Lejupielādes pogas
-# ===========================
+# =============================================================================
 def display_download_buttons():
-    """
-    Ja 'joined_gdf' nav tukšs, parāda lejupielādes pogas: GeoJSON, Shapefile, DXF, CSV (code), CSV (visi lauki), Excel.
-    """
     if st.session_state.get('joined_gdf') is None or st.session_state['joined_gdf'].empty:
         st.error(translations[language]["error_no_data_download"])
         return
@@ -600,7 +582,7 @@ def display_download_buttons():
         total_steps = 6
         current_step = 0
 
-        # 1) GeoJSON
+        # 1) GEOJSON
         try:
             progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
             geojson_str = joined_gdf.to_json()
@@ -619,7 +601,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 2) Shapefile (ZIP)
+        # 2) SHAPEFILE (ZIP)
         try:
             progress_text.text(translations[language].get("preparing_shapefile", "2. Sagatavo Shapefile ZIP failu..."))
             shp_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.shp')
@@ -837,15 +819,10 @@ def display_download_buttons():
         progress_bar.empty()
 
 
-# =================================
-#   NOMINATIM ADRESES MEKLĒŠANA
-# =================================
+# =============================================================================
+#  Adreses meklēšana (Nominatim) + diagnostika
+# =============================================================================
 def geocode_address(address_text):
-    """
-    Izmanto Nominatim, lai atrastu koordinātes pēc ievadītās adreses/lokācijas.
-    Pievienotas diagnostikas rindas (status code, atbildes teksts).
-    Atgriež (lat, lon) vai (None, None), ja nekas nav atrasts.
-    """
     if not address_text:
         return None, None
     try:
@@ -856,7 +833,7 @@ def geocode_address(address_text):
             'limit': 5
         }
         headers = {
-            # Norādiet saprotamu User-Agent, pretējā gadījumā Nominatim var bloķēt pieprasījumu!
+            # User-Agent obligāts
             'User-Agent': 'MyStreamlitApp/1.0 (myemail@domain.com)'
         }
         r = requests.get(url, params=params, headers=headers, timeout=10)
@@ -868,7 +845,6 @@ def geocode_address(address_text):
         r.raise_for_status()
         data = r.json()
         if data:
-            # Ņemam pirmo atrasto rezultātu
             lat = float(data[0]["lat"])
             lon = float(data[0]["lon"])
             return lat, lon
@@ -879,9 +855,9 @@ def geocode_address(address_text):
         return None, None
 
 
-# ===========================
-#  GALVENĀ LIETOTNES FUNKCIJA
-# ===========================
+# =============================================================================
+#  Galvenā lietotnes saskarne
+# =============================================================================
 def show_main_app():
     direct_pdf_url = "https://drive.google.com/uc?export=download&id=1jUh4Uq9svZsnAWCkN6VQHW1C0kp1wLws"
     col1, col2 = st.columns([3, 1])
@@ -927,9 +903,9 @@ def show_main_app():
 
     st.session_state['input_option'] = input_option
 
-    # ==========================================
+    # =========================================================================
     #  1) Augšupielādēt SHP/DXF
-    # ==========================================
+    # =========================================================================
     if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
         st.markdown(
@@ -1008,9 +984,9 @@ def show_main_app():
             with st.empty():
                 st_folium(m, width=700, height=500, key='upload_map')
 
-    # ==========================================
+    # =========================================================================
     #  2) Zīmēt poligonu
-    # ==========================================
+    # =========================================================================
     else:
         st.info(translations[language]["draw_instruction"])
 
@@ -1034,18 +1010,19 @@ def show_main_app():
                     label=translations[language]["get_data_button"]
                 )
 
-            # Ja meklē adresi
+            # Ja nospiesta poga "Meklēt"
             if search_button and address_text.strip():
                 lat, lon = geocode_address(address_text.strip())
                 if lat is not None and lon is not None:
                     st.session_state['map_center'] = [lat, lon]
+                    st.write("Karte tiks centrēta:", st.session_state['map_center'])
                 else:
                     st.warning(translations[language]["search_error"])
 
             # Zīmējam karti ar atjaunoto centru
-            m = folium.Map(location=st.session_state['map_center'], zoom_start=10)
+            current_lat, current_lon = st.session_state['map_center']
+            m = folium.Map(location=[current_lat, current_lon], zoom_start=10)
 
-            # Papildu WMS slāņi
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
             wms_layers = {
                 'Ortofoto': {'layers': 'public:Orto_LKS'},
@@ -1091,7 +1068,11 @@ def show_main_app():
             folium.LayerControl().add_to(m)
             m.get_root().add_child(CustomDeleteButton())
 
-            output = st_folium(m, width=700, height=500, key='draw_map')
+            # **Dinamiska key** - lai piespiestu karti vienmēr "redraw"
+            map_key = f"draw_map_{current_lat:.6f}_{current_lon:.6f}"
+
+            # Izvadām karti
+            output = st_folium(m, width=700, height=500, key=map_key)
 
             # Ja nospiesta poga "Iegūt datus"
             if submit_button:
@@ -1107,9 +1088,9 @@ def show_main_app():
                 else:
                     st.error(translations[language]["info_draw"])
 
-    # ==========================================
-    #  Ja apstrādāti dati, rādam rezultātus
-    # ==========================================
+    # =========================================================================
+    #  Ja apstrādāti dati, rādam rezultātu un lejupielādes
+    # =========================================================================
     if st.session_state.get('data_ready', False):
         display_map_with_results()
         display_download_buttons()
@@ -1125,16 +1106,16 @@ def show_main_app():
     )
 
 
-# ===========================
-#       GALVENĀ ieeja
-# ===========================
+# =============================================================================
+#  main() - Galvenā programma
+# =============================================================================
 def main():
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
     if 'username_logged' not in st.session_state:
         st.session_state.username_logged = ''
 
-    # Ja lietotājs nav pieteicies, rādam login formu
+    # Pieteikšanās
     if not st.session_state.logged_in:
         show_login()
     else:
