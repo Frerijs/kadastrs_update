@@ -77,7 +77,7 @@ translations = {
         "preparing_all_excel": "6. Sagatavo VISU EXCEL failu...",
         "warning_code_missing": 'Kolonna "code" nav pieejama datos. Teksts netiks pievienots DXF failā.',
         "instructions": "Instrukcija",
-        "search_address": "Meklēt adresi vai "code",
+        "search_address": "Meklēt adresi vai",
         "search_button": "Meklēt",
         "search_error": "Neizdevās atrast adresi vai "code".",
         "enter_codes_label": "Ievadiet 'code'(s):",
