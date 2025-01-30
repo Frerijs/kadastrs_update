@@ -79,7 +79,7 @@ translations = {
         "instructions": "Instrukcija",
         "search_address": "Meklēt adresi vai",
         "search_button": "Meklēt",
-        "search_error": "Neizdevās atrast adresi vai "code".",
+        "search_error": "Neizdevās atrast adresi vai",
         "enter_codes_label": "Ievadiet 'code'(s):",
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti 'code'. Lūdzu, ievadiet vienu vai vairākus 'code'.",
