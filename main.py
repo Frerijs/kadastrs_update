@@ -1,5 +1,5 @@
+
 import os
-import json
 import geopandas as gpd
 import folium
 from urllib.parse import urlencode
@@ -9,6 +9,8 @@ import streamlit as st
 from streamlit_folium import st_folium
 from shapely.geometry import Polygon, LineString, Point, MultiPolygon
 import tempfile
+
+# Papildu bibliotēkas
 import ezdxf
 from shapely.ops import linemerge, polygonize, unary_union
 import datetime
@@ -20,6 +22,7 @@ from folium import MacroElement
 from jinja2 import Template
 import base64
 from arcgis2geojson import arcgis2geojson
+import json
 
 # Supabase konfigurācija (demonstrācijas vajadzībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
@@ -199,6 +202,7 @@ class CustomDeleteButton(MacroElement):
     def __init__(self):
         super().__init__()
 
+
 # =============================================================================
 #  Lietotāja autentifikācija (Supabase DEMO)
 # =============================================================================
@@ -256,6 +260,7 @@ def log_user_login(username):
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
+
 def login():
     username = st.session_state.get('username', '').strip()
     password = st.session_state.get('password', '').strip()
@@ -291,6 +296,7 @@ def show_login():
         unsafe_allow_html=True
     )
 
+
 # =============================================================================
 # PDF attēlošanai (ja vajadzīgs)
 # =============================================================================
@@ -311,6 +317,7 @@ def display_pdf(file_path):
         )
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+
 
 # =============================================================================
 #  DXF -> GeoDataFrame
@@ -407,6 +414,7 @@ def read_dxf_to_geodataframe(dxf_file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
         return gpd.GeoDataFrame()
 
+
 # =============================================================================
 #  WMS slāņa pievienošana Folium kartei
 # =============================================================================
@@ -428,6 +436,7 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
             (f"Neizdevās pievienot {name} slāni: {e}" if language == "Latviešu"
              else f"Failed to add {name} layer: {e}")
         )
+
 
 # =============================================================================
 #  Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
@@ -494,12 +503,10 @@ def process_input(input_data, input_method):
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(20)
 
-        st.write("Vaicājuma URL:", query_url)  # Redzam vaicājuma URL
-
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
-            st.write("API Atbilde:", resp.text)  # Redzam API atbildi
+            st.write("API Atbilde:", resp.text)  # Pievienojam šo, lai redzētu API atbildi
             return
         progress_bar.progress(30)
 
@@ -508,7 +515,7 @@ def process_input(input_data, input_method):
         # Pārbaudām, vai atbilde satur 'features' atslēgu
         if 'features' not in esri_data:
             st.error("ArcGIS REST API atbilde nesatur 'features' atslēgu.")
-            st.write("API Atbilde:", esri_data)  # Redzam API atbildi
+            st.write("API Atbilde:", esri_data)  # Pievienojam šo, lai redzētu API atbildi
             return
 
         # Pārvēršam ESRI GeoJSON formātā
@@ -517,7 +524,7 @@ def process_input(input_data, input_method):
 
         if 'features' not in geojson_data:
             st.error("GeoJSON datiem trūkst 'features' atslēgas.")
-            st.write("GeoJSON Atbilde:", geojson_data)  # Redzam GeoJSON atbildi
+            st.write("GeoJSON Atbilde:", geojson_data)  # Pievienojam šo, lai redzētu GeoJSON atbildi
             return
 
         arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
@@ -546,7 +553,7 @@ def process_input(input_data, input_method):
                 'outFields': '*',
                 'returnGeometry': 'true',
                 'outSR': '3059',
-                'spatialRel': 'esriSpatialRelTouches',  # Izmantojam 'Touches' relāciju
+                'spatialRel': 'esriSpatialRelIntersects',  # Pārslēdzam uz Intersects
                 'geometry': json.dumps({
                     "xmin": union_geometry.bounds[0],
                     "ymin": union_geometry.bounds[1],
@@ -560,8 +567,6 @@ def process_input(input_data, input_method):
             }
 
             adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
-            st.write("Otrā Vaicājuma URL:", adjacent_query_url)  # Redzam otrā vaicājuma URL
-
             resp_adjacent = requests.get(adjacent_query_url)
             if resp_adjacent.status_code != 200:
                 st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
@@ -644,6 +649,14 @@ def display_map_with_results():
             style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
         ).add_to(m)
 
+    elif input_method == 'code_with_adjacent':
+        # Ja nepieciešams, var atšķirt filtrētos un pieskarošos poligonus
+        # Piemēram, izmantojot atšķirīgas slāņu nosaukumus vai krāsas
+        # Šeit pieņemam, ka 'code' ir filtrēti un paziņojām, ka pārējie ir pieskarošie
+        # Varētu arī pievienot īpašu lauku, lai atšķirtu grupas
+        pass
+
+    # Atšķirīgi attēlojam filtrētos un pieskarošos poligonus
     if input_method == 'code_with_adjacent':
         # Iegūstam filtrētos kodus
         codes = st.session_state['base_file_name'].split('_')
@@ -677,6 +690,7 @@ def display_map_with_results():
         m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
 
     st_folium(m, width=700, height=500, key='result_map')
+
 
 # =============================================================================
 #  Lejupielādes pogas
@@ -934,6 +948,7 @@ def display_download_buttons():
         progress_text.empty()
         progress_bar.empty()
 
+
 # =============================================================================
 #  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
 # =============================================================================
@@ -970,6 +985,7 @@ def geocode_address(address_text):
             return None, None, None, None
     except:
         return None, None, None, None
+
 
 # =============================================================================
 #  Galvenā lietotnes saskarne
@@ -1313,6 +1329,7 @@ def show_main_app():
         unsafe_allow_html=True
     )
 
+
 # =============================================================================
 #  main() - Galvenā programma
 # =============================================================================
@@ -1327,5 +1344,7 @@ def main():
     else:
         show_main_app()
 
+
 if __name__ == '__main__':
     main()
+
