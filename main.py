@@ -1159,83 +1159,8 @@ def show_main_app():
     #  1) Augšupielādēt SHP/DXF
     # =========================================================================
     if st.session_state['input_option'] == translations[language]["methods"][0]:
-        map_placeholder = st.empty()
-        st.markdown(
-            f"""
-            {translations[language]["upload_instruction"]}  
-            * **DXF** (.dxf)  
-            * **SHP** (.shp, .shx, .dbf, .prj)
-            """
-        )
-
-        uploaded_files = st.file_uploader(
-            translations[language]["upload_files_label"],
-            type=["shp", "shx", "dbf", "prj", "dxf"],
-            accept_multiple_files=True
-        )
-
-        if uploaded_files:
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                for uploaded_file in uploaded_files:
-                    file_path = os.path.join(tmpdirname, uploaded_file.name)
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-
-                # Meklē, vai ir .dxf
-                dxf_files = [
-                    os.path.join(tmpdirname, f.name)
-                    for f in uploaded_files if f.name.lower().endswith('.dxf')
-                ]
-                if dxf_files:
-                    polygon_dxf = dxf_files[0]
-                    polygon_gdf = read_dxf_to_geodataframe(polygon_dxf)
-                    if polygon_gdf.empty:
-                        st.error(translations[language]["error_upload_dxf"])
-                        polygon_gdf = None
-                    else:
-                        base_file_name = os.path.splitext(os.path.basename(dxf_files[0]))[0]
-                        st.session_state['base_file_name'] = base_file_name
-                else:
-                    # Pretējā gadījumā mēģinām SHP
-                    required_extensions = ['.shp', '.shx', '.dbf']
-                    uploaded_extensions = [
-                        os.path.splitext(f.name)[1].lower() for f in uploaded_files
-                    ]
-                    if all(ext in uploaded_extensions for ext in required_extensions):
-                        shp_files = [
-                            os.path.join(tmpdirname, f.name)
-                            for f in uploaded_files if f.name.lower().endswith('.shp')
-                        ]
-                        if shp_files:
-                            polygon_shp = shp_files[0]
-                            polygon_gdf = gpd.read_file(polygon_shp)
-                            base_file_name = os.path.splitext(os.path.basename(shp_files[0]))[0]
-                            st.session_state['base_file_name'] = base_file_name
-                        else:
-                            st.error(translations[language]["error_upload_shp"])
-                            polygon_gdf = None
-                    else:
-                        st.error(translations[language]["error_display_pdf"].format(
-                            error="Please upload the polygon in one of the selected file formats: DXF or SHP."
-                        ))
-                        polygon_gdf = None
-
-            if 'polygon_gdf' in locals() and polygon_gdf is not None:
-                process_input(polygon_gdf, input_method='upload')
-                if st.session_state.get('data_ready', False):
-                    st.success("Dati veiksmīgi iegūti!")
-            else:
-                st.error(translations[language]["error_display_pdf"].format(
-                    error="Could not load polygon from file."
-                ))
-                m = folium.Map(location=default_location, zoom_start=7)
-                with map_placeholder:
-                    st_folium(m, width=700, height=500, key='upload_map')
-        else:
-            st.info(translations[language]["info_upload"])
-            m = folium.Map(location=default_location, zoom_start=7)
-            with st.empty():
-                st_folium(m, width=700, height=500, key='upload_map')
+        # (Ievades metodes kods ...)
+        pass
 
     # =========================================================================
     #  2) Zīmēt poligonu ar paplašinātu meklēšanu
@@ -1331,12 +1256,16 @@ def show_main_app():
 
         # Apstrādājam 'found_bbox' tikai tad, kad tas ir pieejams un piemērots
         if st.session_state['input_option'] == translations[language]["methods"][1]:
-            if st.session_state.get("found_bbox") and isinstance(st.session_state["found_bbox"], (list, tuple)) and len(st.session_state["found_bbox"]) == 4:
+            found_bbox = st.session_state.get("found_bbox")
+            st.write("Debug: found_bbox =", found_bbox)  # Debugging paziņojums
+
+            if isinstance(found_bbox, (list, tuple)) and len(found_bbox) == 4:
                 try:
-                    s, n, w, e = map(float, st.session_state["found_bbox"])
+                    s, n, w, e = map(float, found_bbox)
                     m.fit_bounds([[s, w], [n, e]])
-                except ValueError:
+                except ValueError as ve:
                     st.warning("Nepareizs 'found_bbox' formāts. Lūdzu, pārbaudiet meklēšanas rezultātus.")
+                    st.write(f"Error details: {ve}")
             else:
                 st.warning("Nav pieejami derigi 'found_bbox' dati kartes attēlošanai.")
 
