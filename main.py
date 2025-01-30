@@ -474,6 +474,43 @@ def search_by_code(code):
         return None
 
 # =============================================================================
+#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
+# =============================================================================
+def geocode_address(address_text):
+    """
+    Vaicā Nominatim ar parametru polygon_geojson=1, lai iegūtu
+    gan lat/lon, gan poligona robežu (ja pieejams).
+    Atgriež (lat, lon, polygon_geojson, bounding_box) vai (None, None, None, None) ja nav atrasts.
+    """
+    if not address_text:
+        return None, None, None, None
+    try:
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            "format": "json",
+            "q": address_text,
+            "limit": 5,
+            "polygon_geojson": 1  # lai dabūtu robežu GeoJSON
+        }
+        headers = {
+            "User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"
+        }
+        r = requests.get(url, params=params, headers=headers, timeout=10)
+        r.raise_for_status()
+
+        data = r.json()
+        if data:
+            lat = float(data[0]["lat"])
+            lon = float(data[0]["lon"])
+            poly_geojson = data[0].get("geojson")
+            bbox = data[0].get("boundingbox")  # [s,n,w,e]
+            return lat, lon, poly_geojson, bbox
+        else:
+            return None, None, None, None
+    except:
+        return None, None, None, None
+
+# =============================================================================
 #  Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
 # =============================================================================
 def process_input(input_data, input_method):
@@ -762,7 +799,12 @@ def display_map_with_results():
         base_file_name = st.session_state.get('base_file_name', '')
         # Ja display_codes satur papildus informāciju, atdalām to
         if '_codi' in base_file_name:
-            codes_part = base_file_name.split('_')[:base_file_name.split('_').index('_codi')]
+            parts = base_file_name.split('_')
+            codi_index = parts.index('codi') if 'codi' in parts else -1
+            if codi_index != -1:
+                codes_part = parts[:codi_index]
+            else:
+                codes_part = parts
             codes = codes_part
         else:
             codes = base_file_name.split('_')
@@ -1056,43 +1098,6 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
-# =============================================================================
-def geocode_address(address_text):
-    """
-    Vaicā Nominatim ar parametru polygon_geojson=1, lai iegūtu
-    gan lat/lon, gan poligona robežu (ja pieejams).
-    Atgriež (lat, lon, polygon_geojson, bounding_box) vai (None, None, None, None) ja nav atrasts.
-    """
-    if not address_text:
-        return None, None, None, None
-    try:
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            "format": "json",
-            "q": address_text,
-            "limit": 5,
-            "polygon_geojson": 1  # lai dabūtu robežu GeoJSON
-        }
-        headers = {
-            "User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"
-        }
-        r = requests.get(url, params=params, headers=headers, timeout=10)
-        r.raise_for_status()
-
-        data = r.json()
-        if data:
-            lat = float(data[0]["lat"])
-            lon = float(data[0]["lon"])
-            poly_geojson = data[0].get("geojson")
-            bbox = data[0].get("boundingbox")  # [s,n,w,e]
-            return lat, lon, poly_geojson, bbox
-        else:
-            return None, None, None, None
-    except:
-        return None, None, None, None
-
-# =============================================================================
 #  Galvenā lietotnes saskarne
 # =============================================================================
 def show_main_app():
@@ -1315,15 +1320,16 @@ def show_main_app():
                 style_function=lambda x: {"color": "green", "fillOpacity": 0.2}
             ).add_to(m)
 
-        # Pārskatītā pārbaude pirms 'found_bbox' apstrādes
-        if st.session_state.get("found_bbox") and isinstance(st.session_state["found_bbox"], (list, tuple)) and len(st.session_state["found_bbox"]) == 4:
-            try:
-                s, n, w, e = map(float, st.session_state["found_bbox"])
-                m.fit_bounds([[s, w], [n, e]])
-            except ValueError:
-                st.warning("Nepareizs 'found_bbox' formāts. Lūdzu, pārbaudiet meklēšanas rezultātus.")
-        else:
-            st.warning("Nav pieejami derīgi 'found_bbox' dati kartes attēlošanai.")
+        # Apstrādājam 'found_bbox' tikai tad, kad tas ir pieejams un piemērots
+        if st.session_state['input_option'] == translations[language]["methods"][1]:
+            if st.session_state.get("found_bbox") and isinstance(st.session_state["found_bbox"], (list, tuple)) and len(st.session_state["found_bbox"]) == 4:
+                try:
+                    s, n, w, e = map(float, st.session_state["found_bbox"])
+                    m.fit_bounds([[s, w], [n, e]])
+                except ValueError:
+                    st.warning("Nepareizs 'found_bbox' formāts. Lūdzu, pārbaudiet meklēšanas rezultātus.")
+            else:
+                st.warning("Nav pieejami derīgi 'found_bbox' dati kartes attēlošanai.")
 
         drawnItems = folium.FeatureGroup(name="Drawn Items")
         drawnItems.add_to(m)
@@ -1450,7 +1456,7 @@ def show_main_app():
             display_download_buttons()
 
     # =========================================================================
-    #  Ja ir dati no poligona vai kodiem
+    #  Ja ir dati no poligona vai kodiem (izņemot 'code' un 'code_with_adjacent')
     # =========================================================================
     if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
         translations[language]["methods"][2],
