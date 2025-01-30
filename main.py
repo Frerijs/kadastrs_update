@@ -445,12 +445,7 @@ def process_input(input_data, input_method):
         progress_text = st.empty()
 
         st.session_state['input_method'] = input_method
-        if input_method == 'upload':
-            progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
-        elif input_method == 'drawn':
-            progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
-        elif input_method == 'code':
-            progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
+        progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
 
         arcgis_url_base = (
             "https://utility.arcgis.com/usrsvcs/servers/"
@@ -471,14 +466,30 @@ def process_input(input_data, input_method):
         if input_method in ['upload', 'drawn']:
             polygon_gdf = input_data.to_crs(epsg=3059)
             minx, miny, maxx, maxy = polygon_gdf.total_bounds
+            # ESRI REST API expects geometry as a JSON string
+            geometry = {
+                "xmin": minx,
+                "ymin": miny,
+                "xmax": maxx,
+                "ymax": maxy,
+                "spatialReference": {"wkid": 3059}
+            }
             params.update({
                 'where': '1=1',
-                'geometry': f'{minx},{miny},{maxx},{maxy}',
+                'geometry': json.dumps(geometry),
                 'geometryType': 'esriGeometryEnvelope',
                 'inSR': '3059',
                 'outSR': '3059',
             })
         elif input_method == 'code':
+            codes = input_data
+            # Sanitize and format codes for SQL IN clause
+            sanitized_codes = [code.strip().replace("'", "''") for code in codes]
+            codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
+            params.update({
+                'where': f"code IN ({codes_str})"
+            })
+        elif input_method == 'code_with_adjacent':
             codes = input_data
             # Sanitize and format codes for SQL IN clause
             sanitized_codes = [code.strip().replace("'", "''") for code in codes]
@@ -499,8 +510,17 @@ def process_input(input_data, input_method):
         esri_data = resp.json()
         progress_bar.progress(40)
 
+        if 'features' not in esri_data:
+            st.error("ArcGIS REST API atbilde nesatur 'features' atslēgu.")
+            return
+
+        # Pārvēršam ESRI GeoJSON formatā
         geojson_data = arcgis2geojson(esri_data)
         progress_bar.progress(50)
+
+        if 'features' not in geojson_data:
+            st.error("GeoJSON datiem trūkst 'features' atslēgas.")
+            return
 
         arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
         if arcgis_gdf.crs is None:
@@ -513,9 +533,66 @@ def process_input(input_data, input_method):
             joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
         elif input_method == 'code':
             joined_gdf = arcgis_gdf.copy()
+        elif input_method == 'code_with_adjacent':
+            # Pirma iegūstam filtrētos 'code'
+            filtered_gdf = arcgis_gdf.copy()
 
-        joined_gdf = joined_gdf.reset_index(drop=True).fillna('')
-        progress_bar.progress(70)
+            # Tagad iegūstam pieskarošos poligonus
+            # Sagatavojam vajadzīgo GeoDataFrame (viena vai vairākas geometrijas)
+            filtered_geometries = filtered_gdf.geometry.tolist()
+            union_geometry = unary_union(filtered_geometries)
+
+            # Izveidojam pareizu ģeometrijas formātu
+            adjacent_params = {
+                'f': 'json',
+                'outFields': '*',
+                'returnGeometry': 'true',
+                'outSR': '3059',
+                'spatialRel': 'esriSpatialRelTouches',
+                'geometry': json.dumps({
+                    "xmin": union_geometry.bounds[0],
+                    "ymin": union_geometry.bounds[1],
+                    "xmax": union_geometry.bounds[2],
+                    "ymax": union_geometry.bounds[3],
+                    "spatialReference": {"wkid": 3059}
+                }),
+                'geometryType': 'esriGeometryEnvelope',
+                'inSR': '3059',
+                'outSR': '3059',
+            }
+
+            adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
+            resp_adjacent = requests.get(adjacent_query_url)
+            if resp_adjacent.status_code != 200:
+                st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
+                return
+
+            esri_adjacent_data = resp_adjacent.json()
+
+            if 'features' not in esri_adjacent_data:
+                st.error("ArcGIS REST API atbilde otrajā vaicājumā nesatur 'features' atslēgu.")
+                return
+
+            # Pārvēršam ESRI GeoJSON formatā
+            geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
+            progress_bar.progress(70)
+
+            if 'features' not in geojson_adjacent_data:
+                st.error("GeoJSON datiem otrajā vaicājumā trūkst 'features' atslēgas.")
+                return
+
+            adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
+            if adjacent_gdf.crs is None:
+                adjacent_gdf.crs = "EPSG:3059"
+            else:
+                adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
+
+            # Apvienojam filtrētos un pieskarošos poligonus
+            combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
+
+            joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
+
+        progress_bar.progress(80)
 
         for col in joined_gdf.columns:
             if col != 'geometry':
@@ -525,11 +602,13 @@ def process_input(input_data, input_method):
         invalid_geometries = ~joined_gdf.is_valid
         if invalid_geometries.any():
             joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
-        progress_bar.progress(80)
+        progress_bar.progress(90)
 
         st.session_state['joined_gdf'] = joined_gdf
         if input_method in ['upload', 'drawn']:
             st.session_state['polygon_gdf'] = polygon_gdf
+        if input_method == 'code_with_adjacent':
+            st.session_state['base_file_name'] = "_".join(codes)
 
         current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
         processing_date = current_time.strftime('%Y%m%d')
