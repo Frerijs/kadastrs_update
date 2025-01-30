@@ -21,6 +21,7 @@ from folium import MacroElement
 from jinja2 import Template
 import base64
 from arcgis2geojson import arcgis2geojson
+import json
 
 # Supabase konfigurācija (demonstrācijas vajadzībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
