@@ -461,7 +461,7 @@ def process_input(input_data, input_method):
             'outFields': '*',
             'returnGeometry': 'true',
             'outSR': '3059',
-            'spatialRel': 'esriSpatialRelIntersects',
+            'spatialRel': 'esriSpatialRelIntersects',  # Pārslēdzam uz Intersects
         }
 
         if input_method in ['upload', 'drawn']:
@@ -505,22 +505,25 @@ def process_input(input_data, input_method):
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
+            st.write("API Atbilde:", resp.text)  # Pievienojam šo, lai redzētu API atbildi
             return
         progress_bar.progress(30)
 
         esri_data = resp.json()
-        progress_bar.progress(40)
 
+        # Pārbaudām, vai atbilde satur 'features' atslēgu
         if 'features' not in esri_data:
             st.error("ArcGIS REST API atbilde nesatur 'features' atslēgu.")
+            st.write("API Atbilde:", esri_data)  # Pievienojam šo, lai redzētu API atbildi
             return
 
-        # Pārvēršam ESRI GeoJSON formatā
+        # Pārvēršam ESRI GeoJSON formātā
         geojson_data = arcgis2geojson(esri_data)
         progress_bar.progress(50)
 
         if 'features' not in geojson_data:
             st.error("GeoJSON datiem trūkst 'features' atslēgas.")
+            st.write("GeoJSON Atbilde:", geojson_data)  # Pievienojam šo, lai redzētu GeoJSON atbildi
             return
 
         arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
@@ -549,7 +552,7 @@ def process_input(input_data, input_method):
                 'outFields': '*',
                 'returnGeometry': 'true',
                 'outSR': '3059',
-                'spatialRel': 'esriSpatialRelTouches',
+                'spatialRel': 'esriSpatialRelIntersects',  # Pārslēdzam uz Intersects
                 'geometry': json.dumps({
                     "xmin": union_geometry.bounds[0],
                     "ymin": union_geometry.bounds[1],
@@ -566,20 +569,24 @@ def process_input(input_data, input_method):
             resp_adjacent = requests.get(adjacent_query_url)
             if resp_adjacent.status_code != 200:
                 st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
+                st.write("API Atbilde:", resp_adjacent.text)  # Redzam API atbildi
                 return
 
             esri_adjacent_data = resp_adjacent.json()
 
+            # Pārbaudām, vai atbilde satur 'features' atslēgu
             if 'features' not in esri_adjacent_data:
                 st.error("ArcGIS REST API atbilde otrajā vaicājumā nesatur 'features' atslēgu.")
+                st.write("API Atbilde Otrajā Vaicājumā:", esri_adjacent_data)  # Redzam API atbildi
                 return
 
-            # Pārvēršam ESRI GeoJSON formatā
+            # Pārvēršam ESRI GeoJSON formātā
             geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
             progress_bar.progress(70)
 
             if 'features' not in geojson_adjacent_data:
                 st.error("GeoJSON datiem otrajā vaicājumā trūkst 'features' atslēgas.")
+                st.write("GeoJSON Atbilde Otrajā Vaicājumā:", geojson_adjacent_data)  # Redzam GeoJSON atbildi
                 return
 
             adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
