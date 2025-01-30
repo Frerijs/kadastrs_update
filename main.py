@@ -1,4 +1,3 @@
-
 import os
 import geopandas as gpd
 import folium
@@ -85,7 +84,7 @@ translations = {
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti 'code'. Lūdzu, ievadiet vienu vai vairākus 'code'.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem 'code'.",
-        "info_code_filter": "Dati tiek iegūti gan par norādītajiem 'code', gan par pieskarošiem poligoniem."
+        "info_code_filter": "Dati tiek iegūti gan par norādītajiem 'code' un pieskarošajiem poligoniem."
     },
     "English": {
         "radio_label": "Choose the way to get data:",
@@ -202,7 +201,6 @@ class CustomDeleteButton(MacroElement):
     def __init__(self):
         super().__init__()
 
-
 # =============================================================================
 #  Lietotāja autentifikācija (Supabase DEMO)
 # =============================================================================
@@ -260,7 +258,6 @@ def log_user_login(username):
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-
 def login():
     username = st.session_state.get('username', '').strip()
     password = st.session_state.get('password', '').strip()
@@ -296,7 +293,6 @@ def show_login():
         unsafe_allow_html=True
     )
 
-
 # =============================================================================
 # PDF attēlošanai (ja vajadzīgs)
 # =============================================================================
@@ -317,7 +313,6 @@ def display_pdf(file_path):
         )
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-
 
 # =============================================================================
 #  DXF -> GeoDataFrame
@@ -414,7 +409,6 @@ def read_dxf_to_geodataframe(dxf_file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
         return gpd.GeoDataFrame()
 
-
 # =============================================================================
 #  WMS slāņa pievienošana Folium kartei
 # =============================================================================
@@ -436,7 +430,6 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
             (f"Neizdevās pievienot {name} slāni: {e}" if language == "Latviešu"
              else f"Failed to add {name} layer: {e}")
         )
-
 
 # =============================================================================
 #  Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
@@ -515,7 +508,7 @@ def process_input(input_data, input_method):
         # Pārbaudām, vai atbilde satur 'features' atslēgu
         if 'features' not in esri_data:
             st.error("ArcGIS REST API atbilde nesatur 'features' atslēgu.")
-            st.write("API Atbilde:", esri_data)  # Pievienojam šo, lai redzētu API atbildi
+            st.write("API Atbilde:", esri_data)  # Pievienojam šo, lai redzētu GeoJSON atbildi
             return
 
         # Pārvēršam ESRI GeoJSON formātā
@@ -527,20 +520,28 @@ def process_input(input_data, input_method):
             st.write("GeoJSON Atbilde:", geojson_data)  # Pievienojam šo, lai redzētu GeoJSON atbildi
             return
 
-        arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-        if arcgis_gdf.crs is None:
-            arcgis_gdf.crs = "EPSG:3059"
-        else:
-            arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
-        progress_bar.progress(60)
-
         if input_method in ['upload', 'drawn']:
-            joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
-        elif input_method == 'code':
-            joined_gdf = arcgis_gdf.copy()
-        elif input_method == 'code_with_adjacent':
+            arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
+            if arcgis_gdf.crs is None:
+                arcgis_gdf.crs = "EPSG:3059"
+            else:
+                arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
+            progress_bar.progress(60)
+        elif input_method in ['code', 'code_with_adjacent']:
+            filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
+            if filtered_gdf.crs is None:
+                filtered_gdf.crs = "EPSG:3059"
+            else:
+                filtered_gdf = filtered_gdf.to_crs(epsg=3059)
+            progress_bar.progress(60)
+
+        if input_method == 'code_with_adjacent':
             # Pirma iegūstam filtrētos 'code'
-            filtered_gdf = arcgis_gdf.copy()
+            filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
+            if filtered_gdf.crs is None:
+                filtered_gdf.crs = "EPSG:3059"
+            else:
+                filtered_gdf = filtered_gdf.to_crs(epsg=3059)
 
             # Tagad iegūstam pieskarošos poligonus
             # Sagatavojam vajadzīgo GeoDataFrame (viena vai vairākas geometrijas)
@@ -596,36 +597,54 @@ def process_input(input_data, input_method):
             else:
                 adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
 
+            # Papildu filtrēšana, lai iegūtu tikai pieskarošos poligonus
+            filtered_union = unary_union(filtered_gdf.geometry)
+            adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(filtered_union)]
+
+            progress_bar.progress(80)
+
             # Apvienojam filtrētos un pieskarošos poligonus
             combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
 
             joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
 
-        progress_bar.progress(80)
+            progress_bar.progress(90)
 
-        for col in joined_gdf.columns:
-            if col != 'geometry':
-                if not pd.api.types.is_string_dtype(joined_gdf[col]):
-                    joined_gdf[col] = joined_gdf[col].astype(str)
+            for col in joined_gdf.columns:
+                if col != 'geometry':
+                    if not pd.api.types.is_string_dtype(joined_gdf[col]):
+                        joined_gdf[col] = joined_gdf[col].astype(str)
 
-        invalid_geometries = ~joined_gdf.is_valid
-        if invalid_geometries.any():
-            joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
-        progress_bar.progress(90)
+            invalid_geometries = ~joined_gdf.is_valid
+            if invalid_geometries.any():
+                joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
+            progress_bar.progress(90)
 
-        st.session_state['joined_gdf'] = joined_gdf
-        if input_method in ['upload', 'drawn']:
-            st.session_state['polygon_gdf'] = polygon_gdf
-        if input_method == 'code_with_adjacent':
+            st.session_state['joined_gdf'] = joined_gdf
             st.session_state['base_file_name'] = "_".join(codes)
 
-        current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-        processing_date = current_time.strftime('%Y%m%d')
-        st.session_state['processing_date'] = processing_date
+            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+            processing_date = current_time.strftime('%Y%m%d')
+            st.session_state['processing_date'] = processing_date
 
-        st.session_state['data_ready'] = True
-        progress_text.empty()
-        progress_bar.progress(100)
+            st.session_state['data_ready'] = True
+            progress_text.empty()
+            progress_bar.progress(100)
+
+        else:
+            # Ja ir input_method 'code', tikai filtrēto datus
+            joined_gdf = filtered_gdf.copy()
+
+            st.session_state['joined_gdf'] = joined_gdf
+            st.session_state['base_file_name'] = "_".join(codes)
+
+            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+            processing_date = current_time.strftime('%Y%m%d')
+            st.session_state['processing_date'] = processing_date
+
+            st.session_state['data_ready'] = True
+            progress_text.empty()
+            progress_bar.progress(100)
 
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
@@ -651,9 +670,6 @@ def display_map_with_results():
 
     elif input_method == 'code_with_adjacent':
         # Ja nepieciešams, var atšķirt filtrētos un pieskarošos poligonus
-        # Piemēram, izmantojot atšķirīgas slāņu nosaukumus vai krāsas
-        # Šeit pieņemam, ka 'code' ir filtrēti un paziņojām, ka pārējie ir pieskarošie
-        # Varētu arī pievienot īpašu lauku, lai atšķirtu grupas
         pass
 
     # Atšķirīgi attēlojam filtrētos un pieskarošos poligonus
@@ -690,7 +706,6 @@ def display_map_with_results():
         m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
 
     st_folium(m, width=700, height=500, key='result_map')
-
 
 # =============================================================================
 #  Lejupielādes pogas
@@ -948,7 +963,6 @@ def display_download_buttons():
         progress_text.empty()
         progress_bar.empty()
 
-
 # =============================================================================
 #  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
 # =============================================================================
@@ -985,7 +999,6 @@ def geocode_address(address_text):
             return None, None, None, None
     except:
         return None, None, None, None
-
 
 # =============================================================================
 #  Galvenā lietotnes saskarne
@@ -1329,7 +1342,6 @@ def show_main_app():
         unsafe_allow_html=True
     )
 
-
 # =============================================================================
 #  main() - Galvenā programma
 # =============================================================================
@@ -1344,7 +1356,5 @@ def main():
     else:
         show_main_app()
 
-
 if __name__ == '__main__':
     main()
-
