@@ -42,7 +42,8 @@ translations = {
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
-            'Ievadiet vienu vai vairākus "code" un iegūstiet datus'
+            'Ievadiet vienu vai vairākus "code" un iegūstiet datus',
+            'Ievadiet vienu vai vairākus "code" un iegūstiet datus gan par filtrētajiem "code", gan par pieskarošiem poligoniem'
         ],
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
@@ -81,14 +82,16 @@ translations = {
         "enter_codes_label": "Ievadiet 'code'(s):",
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti 'code'. Lūdzu, ievadiet vienu vai vairākus 'code'.",
-        "error_no_data_found": "Nav atrasti dati ar norādītajiem 'code'."
+        "error_no_data_found": "Nav atrasti dati ar norādītajiem 'code'.",
+        "info_code_filter": "Dati tiek iegūti gan par norādītajiem 'code', gan par pieskarošiem poligoniem."
     },
     "English": {
         "radio_label": "Choose the way to get data:",
         "methods": [
             'Upload a previously prepared closed contour file in .DXF or .SHP format',
             'Draw a closed contour on the map',
-            'Enter one or more "code" to filter and obtain data'
+            'Enter one or more "code" to filter and obtain data',
+            'Enter one or more "code" to filter and obtain data for both the filtered "code" and adjacent polygons'
         ],
         "title": "Download list of cadastral identifiers (ZV boundaries and identifiers)",
         "language_label": "Language / Valoda",
@@ -127,10 +130,10 @@ translations = {
         "enter_codes_label": "Enter 'code'(s):",
         "process_codes_button": "Process Codes",
         "error_no_codes_entered": "No 'code' entered. Please enter one or more 'code'.",
-        "error_no_data_found": "No data found with the provided 'code'."
+        "error_no_data_found": "No data found with the provided 'code'.",
+        "info_code_filter": "Data is obtained both for the provided 'code' and for adjacent polygons."
     }
 }
-
 
 st.set_page_config(
     page_title=translations["Latviešu"]["title"],
@@ -154,7 +157,6 @@ language = st.sidebar.selectbox(
     translations["Latviešu"]["language_label"],
     ["Latviešu", "English"]
 )
-
 
 # =============================================================================
 #  Pielāgots Leaflet kontrolis (dzēš poligonus)
@@ -449,6 +451,8 @@ def process_input(input_data, input_method):
             progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
         elif input_method == 'code':
             progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
+        elif input_method == 'code_with_adjacent':
+            progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
 
         arcgis_url_base = (
             "https://utility.arcgis.com/usrsvcs/servers/"
@@ -484,6 +488,14 @@ def process_input(input_data, input_method):
             params.update({
                 'where': f"code IN ({codes_str})"
             })
+        elif input_method == 'code_with_adjacent':
+            codes = input_data
+            # Sanitize and format codes for SQL IN clause
+            sanitized_codes = [code.strip().replace("'", "''") for code in codes]
+            codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
+            params.update({
+                'where': f"code IN ({codes_str})"
+            })
 
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(20)
@@ -511,8 +523,46 @@ def process_input(input_data, input_method):
             joined_gdf = gpd.sjoin(arcgis_gdf, polygon_gdf, how='inner', predicate='intersects')
         elif input_method == 'code':
             joined_gdf = arcgis_gdf.copy()
+        elif input_method == 'code_with_adjacent':
+            # Pirma iegūstam filtrētos 'code'
+            filtered_gdf = arcgis_gdf.copy()
 
-        joined_gdf = joined_gdf.reset_index(drop=True).fillna('')
+            # Tagad iegūstam pieskarošos poligonus
+            # Sagatavojam vajadzīgo GeoDataFrame (viena vai vairākas geometrijas)
+            filtered_geometries = filtered_gdf.geometry.tolist()
+            union_geometry = unary_union(filtered_geometries)
+
+            # Veicam otru vaicājumu, lai iegūtu pieskarošos poligonus
+            adjacent_params = {
+                'f': 'json',
+                'outFields': '*',
+                'returnGeometry': 'true',
+                'outSR': '3059',
+                'spatialRel': 'esriSpatialRelTouches',
+                'geometry': union_geometry.bounds,  # Bounding box no filtrētajām geometrijām
+                'geometryType': 'esriGeometryEnvelope',
+                'inSR': '3059',
+                'outSR': '3059',
+            }
+
+            adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
+            resp_adjacent = requests.get(adjacent_query_url)
+            if resp_adjacent.status_code != 200:
+                st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
+                return
+            esri_adjacent_data = resp_adjacent.json()
+            geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
+            adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
+            if adjacent_gdf.crs is None:
+                adjacent_gdf.crs = "EPSG:3059"
+            else:
+                adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
+
+            # Apvienojam filtrētos un pieskarošos poligonus
+            combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
+
+            joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
+        
         progress_bar.progress(70)
 
         for col in joined_gdf.columns:
@@ -528,6 +578,8 @@ def process_input(input_data, input_method):
         st.session_state['joined_gdf'] = joined_gdf
         if input_method in ['upload', 'drawn']:
             st.session_state['polygon_gdf'] = polygon_gdf
+        if input_method == 'code_with_adjacent':
+            st.session_state['base_file_name'] = "_".join(codes)
 
         current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
         processing_date = current_time.strftime('%Y%m%d')
@@ -552,7 +604,7 @@ def display_map_with_results():
     tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu"
                      else "Cadastral identifier:")
 
-    if input_method == 'upload':
+    if input_method in ['upload', 'drawn']:
         polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
         folium.GeoJson(
             polygon_gdf,
@@ -560,24 +612,40 @@ def display_map_with_results():
             style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
         ).add_to(m)
 
-    elif input_method == 'drawn':
-        polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
-        folium.GeoJson(
-            polygon_gdf,
-            name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-            style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
-        ).add_to(m)
-
-    elif input_method == 'code':
-        # Ja ir nepieciešams parādīt papildus informāciju, var pievienot šeit
+    elif input_method == 'code_with_adjacent':
+        # Ja nepieciešams, var atšķirt filtrētos un pieskarošos poligonus
+        # Piemēram, izmantojot atšķirīgas slāņu nosaukumus vai krāsas
+        # Šeit pieņemam, ka 'code' ir filtrēti un paziņojām, ka pārējie ir pieskarošie
+        # Varētu arī pievienot īpašu lauku, lai atšķirtu grupas
         pass
 
-    folium.GeoJson(
-        joined_gdf,
-        name=('Kadastra dati' if language == "Latviešu" else 'Cadastral data'),
-        tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-        style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
-    ).add_to(m)
+    # Atšķirīgi attēlojam filtrētos un pieskarošos poligonus
+    if input_method == 'code_with_adjacent':
+        # Iegūstam filtrētos kodus
+        codes = st.session_state['base_file_name'].split('_')
+        filtered_gdf = st.session_state['joined_gdf'][st.session_state['joined_gdf']['code'].isin(codes)]
+        adjacent_gdf = st.session_state['joined_gdf'][~st.session_state['joined_gdf']['code'].isin(codes)]
+
+        folium.GeoJson(
+            filtered_gdf,
+            name=('Filtrētie "code"' if language == "Latviešu" else 'Filtered "code"'),
+            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+            style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
+        ).add_to(m)
+
+        folium.GeoJson(
+            adjacent_gdf,
+            name=('Pieskarošie poligoni' if language == "Latviešu" else 'Adjacent polygons'),
+            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+            style_function=lambda x: {'color': 'green', 'fillOpacity': 0.1}
+        ).add_to(m)
+    else:
+        folium.GeoJson(
+            joined_gdf,
+            name=('Kadastra dati' if language == "Latviešu" else 'Cadastral data'),
+            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+            style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
+        ).add_to(m)
 
     folium.LayerControl().add_to(m)
     if not joined_gdf.empty:
@@ -1170,8 +1238,47 @@ def show_main_app():
             display_map_with_results()
             display_download_buttons()
 
-    # Ja ir dati no poligona vai kodiem
-    if st.session_state.get('data_ready', False) and st.session_state['input_option'] != translations[language]["methods"][2]:
+    # =========================================================================
+    #  4) Ievadīt 'code' un iegūt datus par pieskarošiem poligoniem
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][3]:
+        st.info(translations[language]["info_code_filter"])
+
+        with st.form(key='code_with_adjacent_form'):
+            codes_input = st.text_input(
+                label=translations[language]["enter_codes_label"],
+                value=""
+            )
+            process_codes = st.form_submit_button(
+                label=translations[language]["process_codes_button"]
+            )
+
+            if process_codes:
+                if not codes_input.strip():
+                    st.error(translations[language]["error_no_codes_entered"])
+                else:
+                    # Split codes by comma and strip whitespace
+                    codes = [code.strip() for code in codes_input.split(',') if code.strip()]
+                    if not codes:
+                        st.error(translations[language]["error_no_codes_entered"])
+                    else:
+                        # Set a base_file_name based on entered codes
+                        base_file_name = "_".join(codes)
+                        st.session_state['base_file_name'] = base_file_name
+                        process_input(codes, input_method='code_with_adjacent')
+
+        # Ja ir iepriekš apstrādāti dati, parādām karti
+        if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
+            display_map_with_results()
+            display_download_buttons()
+
+    # =========================================================================
+    #  Ja ir dati no poligona vai kodiem
+    # =========================================================================
+    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
+        translations[language]["methods"][2],
+        translations[language]["methods"][3]
+    ]:
         display_map_with_results()
         display_download_buttons()
 
