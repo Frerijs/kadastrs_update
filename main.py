@@ -1382,97 +1382,95 @@ def show_main_app():
             else:
                 st.error(translations[language]["info_draw"])
 
-# =========================================================================
-#  3) Ievadīt 'code'
-# =========================================================================
-elif st.session_state['input_option'] == translations[language]["methods"][2]:
-    st.info(translations[language]["info_enter_code"])
+    # =========================================================================
+    #  3) Ievadīt 'code'
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][2]:
+        st.info(translations[language]["info_enter_code"])
 
-    with st.form(key='code_form'):
-        codes_input = st.text_input(
-            label=translations[language]["enter_codes_label"],
-            value=""
-        )
-        process_codes = st.form_submit_button(
-            label=translations[language]["process_codes_button"]
-        )
+        with st.form(key='code_form'):
+            codes_input = st.text_input(
+                label=translations[language]["enter_codes_label"],
+                value=""
+            )
+            process_codes = st.form_submit_button(
+                label=translations[language]["process_codes_button"]
+            )
 
-        if process_codes:
-            if not codes_input.strip():
-                st.error(translations[language]["error_no_codes_entered"])
-            else:
-                # Split codes by comma and strip whitespace
-                codes = [code.strip() for code in codes_input.split(',') if code.strip()]
-                if not codes:
+            if process_codes:
+                if not codes_input.strip():
                     st.error(translations[language]["error_no_codes_entered"])
                 else:
-                    # Set a base_file_name based on entered codes
-                    # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
-                    max_codes_in_filename = 5
-                    if len(codes) > max_codes_in_filename:
-                        display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                    # Split codes by comma and strip whitespace
+                    codes = [code.strip() for code in codes_input.split(',') if code.strip()]
+                    if not codes:
+                        st.error(translations[language]["error_no_codes_entered"])
                     else:
-                        display_codes = "_".join(codes)
-                    st.session_state['base_file_name'] = display_codes
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+                        max_codes_in_filename = 5
+                        if len(codes) > max_codes_in_filename:
+                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        else:
+                            display_codes = "_".join(codes)
+                        st.session_state['base_file_name'] = display_codes
 
-                    # Process input
-                    process_input(codes, input_method='code')
+                        # Process input
+                        process_input(codes, input_method='code')
 
-# =========================================================================
-#  4) Ievadīt 'code' un iegūt datus par pieskarošiem poligoniem
-# =========================================================================
-elif st.session_state['input_option'] == translations[language]["methods"][3]:
-    st.info(translations[language]["info_code_filter"])
+    # =========================================================================
+    #  4) Ievadīt 'code' un iegūt datus par pieskarošiem poligoniem
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][3]:
+        st.info(translations[language]["info_code_filter"])
 
-    with st.form(key='code_with_adjacent_form'):
-        codes_input = st.text_input(
-            label=translations[language]["enter_codes_label"],
-            value=""
-        )
-        process_codes = st.form_submit_button(
-            label=translations[language]["process_codes_button"]
-        )
+        with st.form(key='code_with_adjacent_form'):
+            codes_input = st.text_input(
+                label=translations[language]["enter_codes_label"],
+                value=""
+            )
+            process_codes = st.form_submit_button(
+                label=translations[language]["process_codes_button"]
+            )
 
-        if process_codes:
-            if not codes_input.strip():
-                st.error(translations[language]["error_no_codes_entered"])
-            else:
-                # Split codes by comma and strip whitespace
-                codes = [code.strip() for code in codes_input.split(',') if code.strip()]
-                if not codes:
+            if process_codes:
+                if not codes_input.strip():
                     st.error(translations[language]["error_no_codes_entered"])
                 else:
-                    # Set a base_file_name based on entered codes
-                    # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
-                    max_codes_in_filename = 5
-                    if len(codes) > max_codes_in_filename:
-                        display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                    # Split codes by comma and strip whitespace
+                    codes = [code.strip() for code in codes_input.split(',') if code.strip()]
+                    if not codes:
+                        st.error(translations[language]["error_no_codes_entered"])
                     else:
-                        display_codes = "_".join(codes)
-                    st.session_state['base_file_name'] = display_codes
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+                        max_codes_in_filename = 5
+                        if len(codes) > max_codes_in_filename:
+                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        else:
+                            display_codes = "_".join(codes)
+                        st.session_state['base_file_name'] = display_codes
 
-                    # Process input
-                    process_input(codes, input_method='code_with_adjacent')
+                        # Process input
+                        process_input(codes, input_method='code_with_adjacent')
 
-# =========================================================================
-#  Ja ir dati no poligona vai kodiem (izņemot 'code' un 'code_with_adjacent')
-# =========================================================================
-if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
-    translations[language]["methods"][2],
-    translations[language]["methods"][3]
-]:
-    display_map_with_results()
-    display_download_buttons()
+    # =========================================================================
+    #  Ja ir dati no poligona vai kodiem (izņemot 'code' un 'code_with_adjacent')
+    # =========================================================================
+    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
+        translations[language]["methods"][2],
+        translations[language]["methods"][3]
+    ]:
+        display_map_with_results()
+        display_download_buttons()
 
-# Poga Iziet
-if st.button(translations[language]["logout"]):
-    st.session_state.clear()
-    st.success(translations[language]["success_logout"])
+    # Poga Iziet
+    if st.button(translations[language]["logout"]):
+        st.session_state.clear()
+        st.success(translations[language]["success_logout"])
 
-st.markdown(
-    "<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>",
-    unsafe_allow_html=True
-)
+    st.markdown(
+        "<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>",
+        unsafe_allow_html=True
+    )
 
 # =============================================================================
 #  main() - Galvenā programma
