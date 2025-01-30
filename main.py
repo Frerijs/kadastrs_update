@@ -476,15 +476,7 @@ def process_input(input_data, input_method):
                 'inSR': '3059',
                 'outSR': '3059',
             })
-        elif input_method == 'code':
-            codes = input_data
-            # Sanitize and format codes for SQL IN clause
-            sanitized_codes = [code.strip().replace("'", "''") for code in codes]
-            codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
-            params.update({
-                'where': f"code IN ({codes_str})"
-            })
-        elif input_method == 'code_with_adjacent':
+        elif input_method in ['code', 'code_with_adjacent']:
             codes = input_data
             # Sanitize and format codes for SQL IN clause
             sanitized_codes = [code.strip().replace("'", "''") for code in codes]
@@ -506,7 +498,7 @@ def process_input(input_data, input_method):
 
         esri_data = resp.json()
 
-        # Pārbaudām, vai atbilde satur 'features' atslēgu
+        # Pārbaudām, vai atbilde satur 'features' atslēgu un vai tās nav tukšas
         if 'features' not in esri_data or not esri_data['features']:
             st.error(translations[language]["error_no_data_found"])
             st.session_state['data_ready'] = False
@@ -535,6 +527,8 @@ def process_input(input_data, input_method):
             else:
                 filtered_gdf = filtered_gdf.to_crs(epsg=3059)
             progress_bar.progress(60)
+
+        missing_codes = set(codes) - set(filtered_gdf['code'].unique())
 
         if input_method == 'code_with_adjacent':
             # Pirma iegūstam filtrētos 'code'
@@ -578,7 +572,7 @@ def process_input(input_data, input_method):
 
             esri_adjacent_data = resp_adjacent.json()
 
-            # Pārbaudām, vai atbilde satur 'features' atslēgu
+            # Pārbaudām, vai atbilde satur 'features' atslēgu un vai tās nav tukšas
             if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
                 st.error(translations[language]["error_no_data_found"])
                 st.session_state['data_ready'] = False
@@ -628,28 +622,48 @@ def process_input(input_data, input_method):
                 joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
             progress_bar.progress(90)
 
-            st.session_state['joined_gdf'] = joined_gdf
-            st.session_state['base_file_name'] = "_".join(codes)
+            # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+            max_codes_in_filename = 5
+            if len(codes) > max_codes_in_filename:
+                display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+            else:
+                display_codes = "_".join(codes)
+            st.session_state['base_file_name'] = display_codes
+
+            # Noteicam, kuri code nav atrasti
+            if missing_codes:
+                st.warning(f"Nav atrasti dati ar norādītajiem 'code': {', '.join(missing_codes)}")
 
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
             processing_date = current_time.strftime('%Y%m%d')
             st.session_state['processing_date'] = processing_date
 
+            st.session_state['joined_gdf'] = joined_gdf
             st.session_state['data_ready'] = True
             progress_text.empty()
             progress_bar.progress(100)
 
-        else:
+        elif input_method == 'code':
             # Ja ir input_method 'code', tikai filtrēto datus
             joined_gdf = filtered_gdf.copy()
 
-            st.session_state['joined_gdf'] = joined_gdf
-            st.session_state['base_file_name'] = "_".join(codes)
+            # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+            max_codes_in_filename = 5
+            if len(codes) > max_codes_in_filename:
+                display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+            else:
+                display_codes = "_".join(codes)
+            st.session_state['base_file_name'] = display_codes
+
+            # Noteicam, kuri code nav atrasti
+            if missing_codes:
+                st.warning(f"Nav atrasti dati ar norādītajiem 'code': {', '.join(missing_codes)}")
 
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
             processing_date = current_time.strftime('%Y%m%d')
             st.session_state['processing_date'] = processing_date
 
+            st.session_state['joined_gdf'] = joined_gdf
             st.session_state['data_ready'] = True
             progress_text.empty()
             progress_bar.progress(100)
@@ -662,12 +676,12 @@ def process_input(input_data, input_method):
 #  Attēlot kartē rezultātus (zilos poligonus) un ievadīto poligonu vai kodus
 # =============================================================================
 def display_map_with_results():
-    joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
-    input_method = st.session_state.get('input_method', 'drawn')
-
-    if joined_gdf.empty:
+    if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
         st.warning(translations[language]["error_no_data_found"])
         return
+
+    joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
+    input_method = st.session_state.get('input_method', 'drawn')
 
     m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
     tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu"
@@ -689,6 +703,9 @@ def display_map_with_results():
     if input_method == 'code_with_adjacent':
         # Iegūstam filtrētos kodus
         codes = st.session_state['base_file_name'].split('_')
+        # Ja display_codes satur papildus informāciju, atdalām to
+        if '_codi' in codes[-1]:
+            codes = codes[:-1]
         filtered_gdf = st.session_state['joined_gdf'][st.session_state['joined_gdf']['code'].isin(codes)]
         adjacent_gdf = st.session_state['joined_gdf'][~st.session_state['joined_gdf']['code'].isin(codes)]
 
@@ -726,7 +743,7 @@ def display_map_with_results():
 #  Lejupielādes pogas
 # =============================================================================
 def display_download_buttons():
-    if st.session_state.get('joined_gdf') is None or st.session_state['joined_gdf'].empty:
+    if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
         st.error(translations[language]["error_no_data_download"])
         return
 
@@ -1054,7 +1071,8 @@ def show_main_app():
     if st.session_state['previous_option'] != input_option:
         keys_to_reset = [
             'joined_gdf', 'polygon_gdf', 'data_ready',
-            'base_file_name', 'processing_date', 'input_method'
+            'base_file_name', 'processing_date', 'input_method',
+            'missing_codes'
         ]
         for key in keys_to_reset:
             if key in st.session_state:
@@ -1296,8 +1314,15 @@ def show_main_app():
                         st.error(translations[language]["error_no_codes_entered"])
                     else:
                         # Set a base_file_name based on entered codes
-                        base_file_name = "_".join(codes)
-                        st.session_state['base_file_name'] = base_file_name
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+                        max_codes_in_filename = 5
+                        if len(codes) > max_codes_in_filename:
+                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        else:
+                            display_codes = "_".join(codes)
+                        st.session_state['base_file_name'] = display_codes
+
+                        # Process input
                         process_input(codes, input_method='code')
 
         # Ja ir iepriekš apstrādāti dati, parādām karti
@@ -1330,8 +1355,15 @@ def show_main_app():
                         st.error(translations[language]["error_no_codes_entered"])
                     else:
                         # Set a base_file_name based on entered codes
-                        base_file_name = "_".join(codes)
-                        st.session_state['base_file_name'] = base_file_name
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+                        max_codes_in_filename = 5
+                        if len(codes) > max_codes_in_filename:
+                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        else:
+                            display_codes = "_".join(codes)
+                        st.session_state['base_file_name'] = display_codes
+
+                        # Process input
                         process_input(codes, input_method='code_with_adjacent')
 
         # Ja ir iepriekš apstrādāti dati, parādām karti
