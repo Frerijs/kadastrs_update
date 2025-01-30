@@ -9,8 +9,6 @@ import streamlit as st
 from streamlit_folium import st_folium
 from shapely.geometry import Polygon, LineString, Point, MultiPolygon
 import tempfile
-
-# Papildu bibliotēkas
 import ezdxf
 from shapely.ops import linemerge, polygonize, unary_union
 import datetime
@@ -496,10 +494,12 @@ def process_input(input_data, input_method):
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(20)
 
+        st.write("Vaicājuma URL:", query_url)  # Redzam vaicājuma URL
+
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
-            st.write("API Atbilde:", resp.text)  # Pievienojam šo, lai redzētu API atbildi
+            st.write("API Atbilde:", resp.text)  # Redzam API atbildi
             return
         progress_bar.progress(30)
 
@@ -560,6 +560,8 @@ def process_input(input_data, input_method):
             }
 
             adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
+            st.write("Otrā Vaicājuma URL:", adjacent_query_url)  # Redzam otrā vaicājuma URL
+
             resp_adjacent = requests.get(adjacent_query_url)
             if resp_adjacent.status_code != 200:
                 st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
