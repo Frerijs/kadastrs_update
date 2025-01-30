@@ -436,7 +436,7 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         )
 
 
- =============================================================================
+# =============================================================================
 #  Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
 # =============================================================================
 def process_input(input_data, input_method):
