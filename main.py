@@ -8,8 +8,6 @@ import streamlit as st
 from streamlit_folium import st_folium
 from shapely.geometry import Polygon, LineString, Point, MultiPolygon
 import tempfile
-
-# Papildu bibliotēkas
 import ezdxf
 from shapely.ops import linemerge, polygonize, unary_union
 import datetime
@@ -77,10 +75,10 @@ translations = {
         "preparing_all_excel": "6. Sagatavo VISU EXCEL failu...",
         "warning_code_missing": 'Kolonna "code" nav pieejama datos. Teksts netiks pievienots DXF failā.',
         "instructions": "Instrukcija",
-        "search_address": "Meklēt adresi vai",
+        "search_address": 'Meklēt adresi vai "code"',
         "search_button": "Meklēt",
-        "search_error": "Neizdevās atrast adresi vai",
-        "enter_codes_label": "Ievadiet 'code'(s):",
+        "search_error": 'Neizdevās atrast adresi vai "code".',
+        "enter_codes_label": 'Ievadiet "code"(s):',
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti 'code'. Lūdzu, ievadiet vienu vai vairākus 'code'.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem 'code'.",
@@ -125,10 +123,10 @@ translations = {
         "preparing_all_excel": "6. Preparing ALL EXCEL file...",
         "warning_code_missing": '"code" column is not available in the data. Text will not be added to the DXF file.',
         "instructions": "Instructions",
-        "search_address": "Search address or",
+        "search_address": 'Search address or "code"',
         "search_button": "Search",
-        "search_error": "Could not find the address or",
-        "enter_codes_label": "Enter 'code'(s):",
+        "search_error": 'Could not find the address or "code".',
+        "enter_codes_label": 'Enter "code"(s):',
         "process_codes_button": "Process Codes",
         "error_no_codes_entered": "No 'code' entered. Please enter one or more 'code'.",
         "error_no_data_found": "No data found with the provided 'code'.",
@@ -605,7 +603,7 @@ def process_input(input_data, input_method):
                 'outFields': '*',
                 'returnGeometry': 'true',
                 'outSR': '3059',
-                'spatialRel': 'esriSpatialRelIntersects',  # Pārslēdzam uz Intersects
+                'spatialRel': 'esriSpatialRelIntersects',
                 'geometry': json.dumps({
                     "xmin": union_geometry.bounds[0],
                     "ymin": union_geometry.bounds[1],
@@ -1134,7 +1132,7 @@ def show_main_app():
         keys_to_reset = [
             'joined_gdf', 'polygon_gdf', 'data_ready',
             'base_file_name', 'processing_date', 'input_method',
-            'missing_codes'
+            'missing_codes', 'found_geometry', 'found_bbox'
         ]
         for key in keys_to_reset:
             if key in st.session_state:
@@ -1264,7 +1262,8 @@ def show_main_app():
                     # Meklējam pēc "code"
                     gdf_code = search_by_code(input_value)
                     if gdf_code is not None and not gdf_code.empty:
-                        st.session_state['map_center'] = [gdf_code.geometry.centroid.y.iloc[0], gdf_code.geometry.centroid.x.iloc[0]]
+                        centroid = gdf_code.geometry.centroid.iloc[0]
+                        st.session_state['map_center'] = [centroid.y, centroid.x]
                         st.session_state['found_geometry'] = gdf_code.to_crs(epsg=4326).__geo_interface__
                         st.session_state['found_bbox'] = gdf_code.total_bounds  # [minx, miny, maxx, maxy]
                         st.success(f"Atrodama poligona ar 'code': {input_value}")
@@ -1312,17 +1311,19 @@ def show_main_app():
         if st.session_state["found_geometry"]:
             folium.GeoJson(
                 data=st.session_state["found_geometry"],
-                name=("Atrastais poligons (Code)" if input_value.isdigit() else "Atrastais poligons (Nominatim)"),
+                name=("Atrastais poligons (Code)" if address_or_code_input.isdigit() else "Atrastais poligons (Nominatim)"),
                 style_function=lambda x: {"color": "green", "fillOpacity": 0.2}
             ).add_to(m)
 
-        # Ja ir bounding box, fit-ojam karti
-        if st.session_state["found_bbox"]:
-            minx, miny, maxx, maxy = st.session_state["found_bbox"]
+        # Pārskatītā pārbaude pirms 'found_bbox' apstrādes
+        if st.session_state.get("found_bbox") and isinstance(st.session_state["found_bbox"], (list, tuple)) and len(st.session_state["found_bbox"]) == 4:
             try:
-                m.fit_bounds([[miny, minx], [maxy, maxx]])
-            except:
-                pass
+                s, n, w, e = map(float, st.session_state["found_bbox"])
+                m.fit_bounds([[s, w], [n, e]])
+            except ValueError:
+                st.warning("Nepareizs 'found_bbox' formāts. Lūdzu, pārbaudiet meklēšanas rezultātus.")
+        else:
+            st.warning("Nav pieejami derīgi 'found_bbox' dati kartes attēlošanai.")
 
         drawnItems = folium.FeatureGroup(name="Drawn Items")
         drawnItems.add_to(m)
@@ -1366,273 +1367,107 @@ def show_main_app():
             else:
                 st.error(translations[language]["info_draw"])
 
-# =============================================================================
-#  Lejupielādes pogas
-# =============================================================================
-def display_download_buttons():
-    if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
-        st.error(translations[language]["error_no_data_download"])
-        return
+    # =========================================================================
+    #  3) Ievadīt 'code'
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][2]:
+        st.info(translations[language]["info_enter_code"])
 
-    joined_gdf = st.session_state['joined_gdf']
-    with tempfile.TemporaryDirectory() as tmp_output_dir:
-        progress_bar = st.progress(0)
-        progress_text = st.empty()
-
-        base_file_name = st.session_state.get('base_file_name', 'ZV_dati_data')
-        processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
-        file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
-
-        total_steps = 6
-        current_step = 0
-
-        # 1) GEOJSON
-        try:
-            progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
-            geojson_str = joined_gdf.to_json()
-            if not geojson_str:
-                st.error(translations[language]["error_display_pdf"].format(error="Failed to generate GeoJSON data."))
-            else:
-                geojson_bytes = geojson_str.encode('utf-8')
-                st.download_button(
-                    label=translations[language]["download_geojson"],
-                    data=geojson_bytes,
-                    file_name=f'{file_name_prefix}.geojson',
-                    mime='application/geo+json'
-                )
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-
-        # 2) SHAPEFILE (ZIP)
-        try:
-            progress_text.text(translations[language].get("preparing_shapefile", "2. Sagatavo Shapefile ZIP failu..."))
-            shp_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.shp')
-            joined_gdf.to_file(shp_output_path, encoding='utf-8')
-
-            cpg_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.cpg')
-            with open(cpg_path, 'w') as cpg_file:
-                cpg_file.write('UTF-8')
-
-            prj_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.prj')
-            crs = joined_gdf.crs
-            with open(prj_path, 'w') as prj_file:
-                prj_file.write(crs.to_wkt())
-
-            import zipfile
-            shp_zip_path = os.path.join(tmp_output_dir, f'{file_name_prefix}_shp.zip')
-            with zipfile.ZipFile(shp_zip_path, 'w') as zipf:
-                for ext in ['shp', 'shx', 'dbf', 'prj', 'cpg']:
-                    file_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.{ext}')
-                    if os.path.exists(file_path):
-                        zipf.write(file_path, arcname=f'{file_name_prefix}.{ext}')
-
-            with open(shp_zip_path, 'rb') as f:
-                shp_zip_bytes = f.read()
-
-            st.download_button(
-                label=translations[language]["download_shapefile"],
-                data=shp_zip_bytes,
-                file_name=f'{file_name_prefix}_shp.zip',
-                mime='application/zip'
+        with st.form(key='code_form'):
+            codes_input = st.text_input(
+                label=translations[language]["enter_codes_label"],
+                value=""
             )
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+            process_codes = st.form_submit_button(
+                label=translations[language]["process_codes_button"]
+            )
 
-        # 3) DXF
-        try:
-            progress_text.text(translations[language].get("preparing_dxf", "3. Sagatavo DXF failu..."))
-            dxf_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.dxf')
-            doc = ezdxf.new(dxfversion='R2010')
-            doc.encoding = 'utf-8'
-
-            if 'KKParcel' not in doc.layers:
-                doc.layers.new(name='KKParcel', dxfattribs={
-                    'color': 0,
-                    'linetype': 'Continuous',
-                    'true_color': 0x00FFFF,
-                    'lineweight': 1,
-                })
-
-            if 'KKParcel_txt' not in doc.layers:
-                doc.layers.new(name='KKParcel_txt', dxfattribs={
-                    'color': 0,
-                    'linetype': 'Continuous',
-                    'true_color': 0x00FFFF,
-                    'lineweight': 1,
-                })
-
-            if 'Tahoma' not in doc.styles:
-                try:
-                    doc.styles.new('Tahoma', dxfattribs={'font': 'Tahoma.ttf'})
-                except:
-                    st.error(translations[language]["warning_code_missing"])
-                    raise
-
-            msp = doc.modelspace()
-
-            if 'code' not in joined_gdf.columns:
-                st.warning(translations[language]["warning_code_missing"])
-            else:
-                for idx, row in joined_gdf.iterrows():
-                    geom = row['geometry']
-                    code_text = row['code']
-
-                    if geom.type == 'Polygon':
-                        exterior_coords = list(geom.exterior.coords)
-                        msp.add_lwpolyline(exterior_coords, dxfattribs={
-                            'layer': 'KKParcel',
-                            'lineweight': 1,
-                        }, close=True)
-                        for interior in geom.interiors:
-                            interior_coords = list(interior.coords)
-                            msp.add_lwpolyline(interior_coords, dxfattribs={
-                                'layer': 'KKParcel',
-                                'lineweight': 1,
-                            }, close=True)
-                        rep_point = geom.representative_point()
-                        text = msp.add_text(
-                            text=code_text,
-                            dxfattribs={
-                                'insert': (rep_point.x, rep_point.y),
-                                'height': 1,
-                                'style': 'Tahoma',
-                                'layer': 'KKParcel_txt',
-                                'lineweight': 1,
-                            }
-                        )
-                        text.dxf.halign = TextHAlign.LEFT
-
-                    elif geom.type == 'MultiPolygon':
-                        for poly in geom.geoms:
-                            exterior_coords = list(poly.exterior.coords)
-                            msp.add_lwpolyline(exterior_coords, dxfattribs={
-                                'layer': 'KKParcel',
-                                'lineweight': 1,
-                            }, close=True)
-                            for interior in poly.interiors:
-                                interior_coords = list(interior.coords)
-                                msp.add_lwpolyline(interior_coords, dxfattribs={
-                                    'layer': 'KKParcel',
-                                    'lineweight': 1,
-                                }, close=True)
-                            rep_point = poly.representative_point()
-                            text = msp.add_text(
-                                text=code_text,
-                                dxfattribs={
-                                    'insert': (rep_point.x, rep_point.y),
-                                    'height': 1,
-                                    'style': 'Tahoma',
-                                    'layer': 'KKParcel_txt',
-                                    'lineweight': 1,
-                                }
-                            )
-                            text.dxf.halign = TextHAlign.LEFT
-
-            doc.saveas(dxf_output_path)
-            with open(dxf_output_path, 'rb') as f:
-                dxf_bytes = f.read()
-
-            if dxf_bytes:
-                st.download_button(
-                    label=translations[language]["download_dxf"],
-                    data=dxf_bytes,
-                    file_name=f'{file_name_prefix}.dxf',
-                    mime='application/dxf'
-                )
-            else:
-                st.error(translations[language]["error_display_pdf"].format(error="Failed to generate DXF file."))
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-
-        # 4) CSV (tikai code)
-        try:
-            progress_text.text(translations[language].get("preparing_csv", "4. Sagatavo CSV failu..."))
-            if 'code' in joined_gdf.columns:
-                code_series = joined_gdf['code'].drop_duplicates()
-                code_df = code_series.to_frame()
-                csv_str = code_df.to_csv(index=False, encoding='utf-8')
-                if not csv_str:
-                    st.error(translations[language]["error_display_pdf"].format(error="Failed to generate CSV data."))
+            if process_codes:
+                if not codes_input.strip():
+                    st.error(translations[language]["error_no_codes_entered"])
                 else:
-                    csv_bytes = csv_str.encode('utf-8')
-                    st.download_button(
-                        label=translations[language]["download_csv"],
-                        data=csv_bytes,
-                        file_name=f'{file_name_prefix}.csv',
-                        mime='text/csv',
-                    )
-            else:
-                st.warning(translations[language]["warning_code_missing"])
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+                    # Split codes by comma and strip whitespace
+                    codes = [code.strip() for code in codes_input.split(',') if code.strip()]
+                    if not codes:
+                        st.error(translations[language]["error_no_codes_entered"])
+                    else:
+                        # Set a base_file_name based on entered codes
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+                        max_codes_in_filename = 5
+                        if len(codes) > max_codes_in_filename:
+                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        else:
+                            display_codes = "_".join(codes)
+                        st.session_state['base_file_name'] = display_codes
 
-        # 5) CSV ar visiem laukiem
-        try:
-            progress_text.text(translations[language].get("preparing_all_csv", "5. Sagatavo VISU CSV failu..."))
-            all_data_df = joined_gdf.copy()
-            all_data_df['geometry'] = all_data_df['geometry'].apply(lambda g: g.wkt if g else None)
-            csv_str_all = all_data_df.to_csv(index=False, encoding='utf-8')
-            if not csv_str_all:
-                st.error(translations[language]["error_display_pdf"].format(error="Failed to generate ALL CSV data."))
-            else:
-                csv_bytes_all = csv_str_all.encode('utf-8')
-                st.download_button(
-                    label=translations[language]["download_all_csv"],
-                    data=csv_bytes_all,
-                    file_name=f'{file_name_prefix}_all.csv',
-                    mime='text/csv'
-                )
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+                        # Process input
+                        process_input(codes, input_method='code')
 
-        # 6) EXCEL ar visiem laukiem
-        try:
-            progress_text.text(translations[language].get("preparing_all_excel", "6. Sagatavo VISU EXCEL failu..."))
-            import io
+        # Ja ir iepriekš apstrādāti dati, parādām karti
+        if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code':
+            display_map_with_results()
+            display_download_buttons()
 
-            xls_data_df = joined_gdf.copy()
-            xls_data_df['geometry'] = xls_data_df['geometry'].apply(lambda g: g.wkt if g else None)
+    # =========================================================================
+    #  4) Ievadīt 'code' un iegūt datus par pieskarošiem poligoniem
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][3]:
+        st.info(translations[language]["info_code_filter"])
 
-            output_excel = io.BytesIO()
-            with pd.ExcelWriter(output_excel, engine='xlsxwriter') as writer:
-                xls_data_df.to_excel(writer, sheet_name='VisiDati', index=False)
-
-            excel_bytes = output_excel.getvalue()
-            st.download_button(
-                label=translations[language]["download_all_excel"],
-                data=excel_bytes,
-                file_name=f"{file_name_prefix}_all.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        with st.form(key='code_with_adjacent_form'):
+            codes_input = st.text_input(
+                label=translations[language]["enter_codes_label"],
+                value=""
             )
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+            process_codes = st.form_submit_button(
+                label=translations[language]["process_codes_button"]
+            )
 
-        progress_text.empty()
-        progress_bar.empty()
+            if process_codes:
+                if not codes_input.strip():
+                    st.error(translations[language]["error_no_codes_entered"])
+                else:
+                    # Split codes by comma and strip whitespace
+                    codes = [code.strip() for code in codes_input.split(',') if code.strip()]
+                    if not codes:
+                        st.error(translations[language]["error_no_codes_entered"])
+                    else:
+                        # Set a base_file_name based on entered codes
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
+                        max_codes_in_filename = 5
+                        if len(codes) > max_codes_in_filename:
+                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        else:
+                            display_codes = "_".join(codes)
+                        st.session_state['base_file_name'] = display_codes
 
-# =============================================================================
-#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
-# =============================================================================
+                        # Process input
+                        process_input(codes, input_method='code_with_adjacent')
 
-# Šī daļa paliek nemainīga, jo mēs pievienojām jaunu funkciju `search_by_code`
+        # Ja ir iepriekš apstrādāti dati, parādām karti
+        if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
+            display_map_with_results()
+            display_download_buttons()
 
-# =============================================================================
-#  Galvenā lietotnes saskarne
-# =============================================================================
+    # =========================================================================
+    #  Ja ir dati no poligona vai kodiem
+    # =========================================================================
+    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
+        translations[language]["methods"][2],
+        translations[language]["methods"][3]
+    ]:
+        display_map_with_results()
+        display_download_buttons()
 
-# Šīs izmaiņas tika veiktas iepriekšējā sadaļā.
+    # Poga Iziet
+    if st.button(translations[language]["logout"]):
+        st.session_state.clear()
+        st.success(translations[language]["success_logout"])
+
+    st.markdown(
+        "<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>",
+        unsafe_allow_html=True
+    )
 
 # =============================================================================
 #  main() - Galvenā programma
