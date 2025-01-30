@@ -500,24 +500,25 @@ def process_input(input_data, input_method):
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
             st.write("API Atbilde:", resp.text)  # Pievienojam šo, lai redzētu API atbildi
+            st.session_state['data_ready'] = False
             return
         progress_bar.progress(30)
 
         esri_data = resp.json()
 
         # Pārbaudām, vai atbilde satur 'features' atslēgu
-        if 'features' not in esri_data:
-            st.error("ArcGIS REST API atbilde nesatur 'features' atslēgu.")
-            st.write("API Atbilde:", esri_data)  # Pievienojam šo, lai redzētu GeoJSON atbildi
+        if 'features' not in esri_data or not esri_data['features']:
+            st.error(translations[language]["error_no_data_found"])
+            st.session_state['data_ready'] = False
             return
 
         # Pārvēršam ESRI GeoJSON formātā
         geojson_data = arcgis2geojson(esri_data)
         progress_bar.progress(50)
 
-        if 'features' not in geojson_data:
-            st.error("GeoJSON datiem trūkst 'features' atslēgas.")
-            st.write("GeoJSON Atbilde:", geojson_data)  # Pievienojam šo, lai redzētu GeoJSON atbildi
+        if 'features' not in geojson_data or not geojson_data['features']:
+            st.error(translations[language]["error_no_data_found"])
+            st.session_state['data_ready'] = False
             return
 
         if input_method in ['upload', 'drawn']:
@@ -572,23 +573,24 @@ def process_input(input_data, input_method):
             if resp_adjacent.status_code != 200:
                 st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
                 st.write("API Atbilde:", resp_adjacent.text)  # Redzam API atbildi
+                st.session_state['data_ready'] = False
                 return
 
             esri_adjacent_data = resp_adjacent.json()
 
             # Pārbaudām, vai atbilde satur 'features' atslēgu
-            if 'features' not in esri_adjacent_data:
-                st.error("ArcGIS REST API atbilde otrajā vaicājumā nesatur 'features' atslēgu.")
-                st.write("API Atbilde Otrajā Vaicājumā:", esri_adjacent_data)  # Redzam API atbildi
+            if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
+                st.error(translations[language]["error_no_data_found"])
+                st.session_state['data_ready'] = False
                 return
 
             # Pārvēršam ESRI GeoJSON formātā
             geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
             progress_bar.progress(70)
 
-            if 'features' not in geojson_adjacent_data:
-                st.error("GeoJSON datiem otrajā vaicājumā trūkst 'features' atslēgas.")
-                st.write("GeoJSON Atbilde Otrajā Vaicājumā:", geojson_adjacent_data)  # Redzam GeoJSON atbildi
+            if 'features' not in geojson_adjacent_data or not geojson_adjacent_data['features']:
+                st.error(translations[language]["error_no_data_found"])
+                st.session_state['data_ready'] = False
                 return
 
             adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
@@ -600,6 +602,12 @@ def process_input(input_data, input_method):
             # Papildu filtrēšana, lai iegūtu tikai pieskarošos poligonus
             filtered_union = unary_union(filtered_gdf.geometry)
             adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(filtered_union)]
+
+            # Ja pēc filtrēšanas nav pieskarošos poligonu, parādām paziņojumu
+            if adjacent_gdf.empty:
+                st.warning(translations[language]["error_no_data_found"])
+                st.session_state['data_ready'] = False
+                return
 
             progress_bar.progress(80)
 
@@ -648,6 +656,7 @@ def process_input(input_data, input_method):
 
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        st.session_state['data_ready'] = False
 
 # =============================================================================
 #  Attēlot kartē rezultātus (zilos poligonus) un ievadīto poligonu vai kodus
@@ -655,6 +664,10 @@ def process_input(input_data, input_method):
 def display_map_with_results():
     joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
     input_method = st.session_state.get('input_method', 'drawn')
+
+    if joined_gdf.empty:
+        st.warning(translations[language]["error_no_data_found"])
+        return
 
     m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
     tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu"
@@ -679,19 +692,21 @@ def display_map_with_results():
         filtered_gdf = st.session_state['joined_gdf'][st.session_state['joined_gdf']['code'].isin(codes)]
         adjacent_gdf = st.session_state['joined_gdf'][~st.session_state['joined_gdf']['code'].isin(codes)]
 
-        folium.GeoJson(
-            filtered_gdf,
-            name=('Filtrētie "code"' if language == "Latviešu" else 'Filtered "code"'),
-            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-            style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
-        ).add_to(m)
+        if not filtered_gdf.empty:
+            folium.GeoJson(
+                filtered_gdf,
+                name=('Filtrētie "code"' if language == "Latviešu" else 'Filtered "code"'),
+                tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+                style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
+            ).add_to(m)
 
-        folium.GeoJson(
-            adjacent_gdf,
-            name=('Pieskarošie poligoni' if language == "Latviešu" else 'Adjacent polygons'),
-            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-            style_function=lambda x: {'color': 'green', 'fillOpacity': 0.1}
-        ).add_to(m)
+        if not adjacent_gdf.empty:
+            folium.GeoJson(
+                adjacent_gdf,
+                name=('Pieskarošie poligoni' if language == "Latviešu" else 'Adjacent polygons'),
+                tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+                style_function=lambda x: {'color': 'green', 'fillOpacity': 0.1}
+            ).add_to(m)
     else:
         folium.GeoJson(
             joined_gdf,
@@ -1115,7 +1130,8 @@ def show_main_app():
 
             if 'polygon_gdf' in locals() and polygon_gdf is not None:
                 process_input(polygon_gdf, input_method='upload')
-                st.session_state['data_ready'] = True
+                if st.session_state.get('data_ready', False):
+                    st.success("Dati veiksmīgi iegūti!")
             else:
                 st.error(translations[language]["error_display_pdf"].format(
                     error="Could not load polygon from file."
@@ -1249,8 +1265,9 @@ def show_main_app():
                         crs='EPSG:4326'
                     )
                     process_input(polygon_gdf, input_method='drawn')
-                    st.session_state['data_ready'] = True
-                    st.session_state['base_file_name'] = 'polygon'
+                    if st.session_state.get('data_ready', False):
+                        st.success("Dati veiksmīgi iegūti!")
+                        st.session_state['base_file_name'] = 'polygon'
                 else:
                     st.error(translations[language]["info_draw"])
 
