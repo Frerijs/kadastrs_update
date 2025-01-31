@@ -632,7 +632,7 @@ def process_input(input_data, input_method):
 
             # Noteicam, kuri code nav atrasti
             if missing_codes:
-                st.warning(f"Nav atrasti dati ar norādītajiem 'code': {', '.join(missing_codes)}")
+                st.warning(f"Nav atrasti dati ar norādītajiem kadastra nummuriem: {', '.join(missing_codes)}")
 
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
             processing_date = current_time.strftime('%Y%m%d')
@@ -657,7 +657,7 @@ def process_input(input_data, input_method):
 
             # Noteicam, kuri code nav atrasti
             if missing_codes:
-                st.warning(f"Nav atrasti dati ar norādītajiem 'code': {', '.join(missing_codes)}")
+                st.warning(f"Nav atrasti dati ar norādītajiem kadastra nummuriem: {', '.join(missing_codes)}")
 
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
             processing_date = current_time.strftime('%Y%m%d')
