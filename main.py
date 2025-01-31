@@ -133,6 +133,7 @@ translations = {
     "error_no_codes_entered": "No cadastral numbers entered. Please enter one or more cadastral numbers.",
     "error_no_data_found": "No data found for the specified cadastral numbers.",
     "info_code_filter": "Data is obtained for both the specified cadastral numbers and adjacent ones."
+   }
 }
 
 st.set_page_config(
