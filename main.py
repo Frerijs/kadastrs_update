@@ -712,7 +712,7 @@ def display_map_with_results():
         if not filtered_gdf.empty:
             folium.GeoJson(
                 filtered_gdf,
-                name=('Filtrētie "code"' if language == "Latviešu" else 'Filtered "code"'),
+                name=('Filtrētie kadastra numuri' if language == "Latviešu" else 'Filtered "code"'),
                 tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
                 style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
             ).add_to(m)
@@ -720,7 +720,7 @@ def display_map_with_results():
         if not adjacent_gdf.empty:
             folium.GeoJson(
                 adjacent_gdf,
-                name=('Pieskarošie poligoni' if language == "Latviešu" else 'Adjacent polygons'),
+                name=('Pieskarošie kadastra numuri' if language == "Latviešu" else 'Adjacent polygons'),
                 tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
                 style_function=lambda x: {'color': 'green', 'fillOpacity': 0.1}
             ).add_to(m)
