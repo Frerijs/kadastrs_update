@@ -43,8 +43,8 @@ translations = {
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
-            'Ievadiet vienu vai vairākus kadastra nummurus un iegūstiet datus',
-            'Ievadiet vienu vai vairākus kadastra nummurus un iegūstiet datus gan par filtrētajiem kadastra nummuriem, gan par pieskarošiem'
+            'Ievadiet vienu vai vairākus kadastra numurus un iegūstiet datus',
+            'Ievadiet vienu vai vairākus kadastra numurus un iegūstiet datus gan par filtrētajiem kadastra numuriem, gan par pieskarošiem'
         ],
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
@@ -68,7 +68,7 @@ translations = {
         "error_display_pdf": "Kļūda: {error}",
         "info_upload": "Lūdzu, augšupielādējiet failu ar poligonu.",
         "info_draw": "Lūdzu, uzzīmējiet poligonu uz kartes.",
-        "info_enter_code": "Lūdzu, ievadiet vienu vai vairākus kadastra nummurus, atdalot ar komatu.",
+        "info_enter_code": "Lūdzu, ievadiet vienu vai vairākus kadastra numurus, atdalot ar komatu.",
         "preparing_geojson": "1. Sagatavo GeoJSON failu...",
         "preparing_shapefile": "2. Sagatavo Shapefile ZIP failu...",
         "preparing_dxf": "3. Sagatavo DXF failu...",
@@ -632,7 +632,7 @@ def process_input(input_data, input_method):
 
             # Noteicam, kuri code nav atrasti
             if missing_codes:
-                st.warning(f"Nav atrasti dati ar norādītajiem kadastra nummuriem: {', '.join(missing_codes)}")
+                st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
 
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
             processing_date = current_time.strftime('%Y%m%d')
@@ -657,7 +657,7 @@ def process_input(input_data, input_method):
 
             # Noteicam, kuri code nav atrasti
             if missing_codes:
-                st.warning(f"Nav atrasti dati ar norādītajiem kadastra nummuriem: {', '.join(missing_codes)}")
+                st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
 
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
             processing_date = current_time.strftime('%Y%m%d')
