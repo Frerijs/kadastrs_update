@@ -43,8 +43,8 @@ translations = {
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
-            'Ievadiet vienu vai vairākus "code" un iegūstiet datus',
-            'Ievadiet vienu vai vairākus "code" un iegūstiet datus gan par filtrētajiem "code", gan par pieskarošiem poligoniem'
+            'Ievadiet vienu vai vairākus kadastra nummurus un iegūstiet datus',
+            'Ievadiet vienu vai vairākus kadastra nummurus un iegūstiet datus gan par filtrētajiem kadastra nummuriem, gan par pieskarošiem'
         ],
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
