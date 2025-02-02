@@ -513,6 +513,14 @@ def process_input(input_data, input_method):
             else:
                 arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
             progress_bar.progress(60)
+            # Saglabājam rezultātu GeoDataFrame arī upload/drawn gadījumos
+            st.session_state['joined_gdf'] = arcgis_gdf
+            st.session_state['data_ready'] = True
+            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+            processing_date = current_time.strftime('%Y%m%d')
+            st.session_state['processing_date'] = processing_date
+            progress_text.empty()
+            progress_bar.progress(100)
         elif input_method in ['code', 'code_with_adjacent']:
             filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
             if filtered_gdf.crs is None:
@@ -522,127 +530,126 @@ def process_input(input_data, input_method):
             progress_bar.progress(60)
             missing_codes = set(codes) - set(filtered_gdf['code'].unique())
 
-        if input_method == 'code_with_adjacent':
-            filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-            if filtered_gdf.crs is None:
-                filtered_gdf.crs = "EPSG:3059"
-            else:
-                filtered_gdf = filtered_gdf.to_crs(epsg=3059)
+            if input_method == 'code_with_adjacent':
+                filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
+                if filtered_gdf.crs is None:
+                    filtered_gdf.crs = "EPSG:3059"
+                else:
+                    filtered_gdf = filtered_gdf.to_crs(epsg=3059)
 
-            filtered_geometries = filtered_gdf.geometry.tolist()
-            union_geometry = unary_union(filtered_geometries)
+                filtered_geometries = filtered_gdf.geometry.tolist()
+                union_geometry = unary_union(filtered_geometries)
 
-            adjacent_params = {
-                'f': 'json',
-                'outFields': '*',
-                'returnGeometry': 'true',
-                'outSR': '3059',
-                'spatialRel': 'esriSpatialRelIntersects',
-                'geometry': json.dumps({
-                    "xmin": union_geometry.bounds[0],
-                    "ymin": union_geometry.bounds[1],
-                    "xmax": union_geometry.bounds[2],
-                    "ymax": union_geometry.bounds[3],
-                    "spatialReference": {"wkid": 3059}
-                }),
-                'geometryType': 'esriGeometryEnvelope',
-                'inSR': '3059',
-                'outSR': '3059',
-            }
+                adjacent_params = {
+                    'f': 'json',
+                    'outFields': '*',
+                    'returnGeometry': 'true',
+                    'outSR': '3059',
+                    'spatialRel': 'esriSpatialRelIntersects',
+                    'geometry': json.dumps({
+                        "xmin": union_geometry.bounds[0],
+                        "ymin": union_geometry.bounds[1],
+                        "xmax": union_geometry.bounds[2],
+                        "ymax": union_geometry.bounds[3],
+                        "spatialReference": {"wkid": 3059}
+                    }),
+                    'geometryType': 'esriGeometryEnvelope',
+                    'inSR': '3059',
+                    'outSR': '3059',
+                }
 
-            adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
-            resp_adjacent = requests.get(adjacent_query_url)
-            if resp_adjacent.status_code != 200:
-                st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
-                st.write("API Atbilde:", resp_adjacent.text)
-                st.session_state['data_ready'] = False
-                return
+                adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
+                resp_adjacent = requests.get(adjacent_query_url)
+                if resp_adjacent.status_code != 200:
+                    st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
+                    st.write("API Atbilde:", resp_adjacent.text)
+                    st.session_state['data_ready'] = False
+                    return
 
-            esri_adjacent_data = resp_adjacent.json()
+                esri_adjacent_data = resp_adjacent.json()
 
-            if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
-                st.error(translations[language]["error_no_data_found"])
-                st.session_state['data_ready'] = False
-                return
+                if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
+                    st.error(translations[language]["error_no_data_found"])
+                    st.session_state['data_ready'] = False
+                    return
 
-            geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
-            progress_bar.progress(70)
+                geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
+                progress_bar.progress(70)
 
-            if 'features' not in geojson_adjacent_data or not geojson_adjacent_data['features']:
-                st.error(translations[language]["error_no_data_found"])
-                st.session_state['data_ready'] = False
-                return
+                if 'features' not in geojson_adjacent_data or not geojson_adjacent_data['features']:
+                    st.error(translations[language]["error_no_data_found"])
+                    st.session_state['data_ready'] = False
+                    return
 
-            adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
-            if adjacent_gdf.crs is None:
-                adjacent_gdf.crs = "EPSG:3059"
-            else:
-                adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
+                adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
+                if adjacent_gdf.crs is None:
+                    adjacent_gdf.crs = "EPSG:3059"
+                else:
+                    adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
 
-            filtered_union = unary_union(filtered_gdf.geometry)
-            adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(filtered_union)]
+                filtered_union = unary_union(filtered_gdf.geometry)
+                adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(filtered_union)]
 
-            if adjacent_gdf.empty:
-                st.warning(translations[language]["error_no_data_found"])
-                st.session_state['data_ready'] = False
-                return
+                if adjacent_gdf.empty:
+                    st.warning(translations[language]["error_no_data_found"])
+                    st.session_state['data_ready'] = False
+                    return
 
-            progress_bar.progress(80)
+                progress_bar.progress(80)
 
-            combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
-            joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
+                combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
+                joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
 
-            progress_bar.progress(90)
+                progress_bar.progress(90)
 
-            for col in joined_gdf.columns:
-                if col != 'geometry':
-                    if not pd.api.types.is_string_dtype(joined_gdf[col]):
-                        joined_gdf[col] = joined_gdf[col].astype(str)
+                for col in joined_gdf.columns:
+                    if col != 'geometry':
+                        if not pd.api.types.is_string_dtype(joined_gdf[col]):
+                            joined_gdf[col] = joined_gdf[col].astype(str)
 
-            invalid_geometries = ~joined_gdf.is_valid
-            if invalid_geometries.any():
-                joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
+                invalid_geometries = ~joined_gdf.is_valid
+                if invalid_geometries.any():
+                    joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
 
-            progress_bar.progress(90)
+                progress_bar.progress(90)
 
-            max_codes_in_filename = 5
-            if len(codes) > max_codes_in_filename:
-                display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
-            else:
-                display_codes = "_".join(codes)
-            st.session_state['base_file_name'] = display_codes
+                max_codes_in_filename = 5
+                if len(codes) > max_codes_in_filename:
+                    display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                else:
+                    display_codes = "_".join(codes)
+                st.session_state['base_file_name'] = display_codes
 
-            if missing_codes:
-                st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
+                if missing_codes:
+                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
 
-            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-            processing_date = current_time.strftime('%Y%m%d')
-            st.session_state['processing_date'] = processing_date
-            st.session_state['joined_gdf'] = joined_gdf
-            st.session_state['data_ready'] = True
-            progress_text.empty()
-            progress_bar.progress(100)
+                current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+                processing_date = current_time.strftime('%Y%m%d')
+                st.session_state['processing_date'] = processing_date
+                st.session_state['joined_gdf'] = joined_gdf
+                st.session_state['data_ready'] = True
+                progress_text.empty()
+                progress_bar.progress(100)
+            elif input_method == 'code':
+                joined_gdf = filtered_gdf.copy()
 
-        elif input_method == 'code':
-            joined_gdf = filtered_gdf.copy()
+                max_codes_in_filename = 5
+                if len(codes) > max_codes_in_filename:
+                    display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                else:
+                    display_codes = "_".join(codes)
+                st.session_state['base_file_name'] = display_codes
 
-            max_codes_in_filename = 5
-            if len(codes) > max_codes_in_filename:
-                display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
-            else:
-                display_codes = "_".join(codes)
-            st.session_state['base_file_name'] = display_codes
+                if missing_codes:
+                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
 
-            if missing_codes:
-                st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
-
-            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-            processing_date = current_time.strftime('%Y%m%d')
-            st.session_state['processing_date'] = processing_date
-            st.session_state['joined_gdf'] = joined_gdf
-            st.session_state['data_ready'] = True
-            progress_text.empty()
-            progress_bar.progress(100)
+                current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+                processing_date = current_time.strftime('%Y%m%d')
+                st.session_state['processing_date'] = processing_date
+                st.session_state['joined_gdf'] = joined_gdf
+                st.session_state['data_ready'] = True
+                progress_text.empty()
+                progress_bar.progress(100)
         else:
             st.session_state['joined_gdf'] = arcgis_gdf
             st.session_state['data_ready'] = True
@@ -657,7 +664,7 @@ def process_input(input_data, input_method):
         st.session_state['data_ready'] = False
 
 # =============================================================================
-#  Attēlot kartē rezultātus (zilos poligonus) un ievadīto poligonu vai kodus
+#  Attēlot kartē rezultātus (gan ievadīto poligonu, gan atlasītos poligonus)
 # =============================================================================
 def display_map_with_results():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -671,45 +678,25 @@ def display_map_with_results():
     tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu"
                      else "Cadastral identifier:")
 
+    # Parādām ievadīto poligonu (ja tas ir saglabāts)
     if input_method in ['upload', 'drawn']:
         if 'polygon_gdf' in st.session_state:
             polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
             folium.GeoJson(
                 polygon_gdf,
                 name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-                style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
+                style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}
             ).add_to(m)
         else:
             st.info("Nav saglabāts ievades poligons.")
-    elif input_method == 'code_with_adjacent':
-        codes = st.session_state['base_file_name'].split('_')
-        if '_codi' in codes[-1]:
-            codes = codes[:-1]
-        filtered_gdf = st.session_state['joined_gdf'][st.session_state['joined_gdf']['code'].isin(codes)]
-        adjacent_gdf = st.session_state['joined_gdf'][~st.session_state['joined_gdf']['code'].isin(codes)]
 
-        if not filtered_gdf.empty:
-            folium.GeoJson(
-                filtered_gdf,
-                name=('Filtrētie kadastra numuri' if language == "Latviešu" else 'Filtered "code"'),
-                tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-                style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
-            ).add_to(m)
-
-        if not adjacent_gdf.empty:
-            folium.GeoJson(
-                adjacent_gdf,
-                name=('Pieskarošie kadastra numuri' if language == "Latviešu" else 'Adjacent polygons'),
-                tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-                style_function=lambda x: {'color': 'green', 'fillOpacity': 0.1}
-            ).add_to(m)
-    else:
-        folium.GeoJson(
-            joined_gdf,
-            name=('Kadastra dati' if language == "Latviešu" else 'Cadastral data'),
-            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-            style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
-        ).add_to(m)
+    # Neatkarīgi no ievades metodes parādām arī atlasītos poligonus
+    folium.GeoJson(
+        joined_gdf,
+        name=('Atlasītie poligoni' if language == "Latviešu" else 'Selected polygons'),
+        tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+        style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1, 'weight': 2}
+    ).add_to(m)
 
     folium.LayerControl().add_to(m)
     if not joined_gdf.empty:
