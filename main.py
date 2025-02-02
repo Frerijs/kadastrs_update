@@ -141,11 +141,10 @@ st.set_page_config(
     layout="centered"
 )
 
-# Palielinām radio pogu etiķetes fontu
+# Palielinām radio pogu etiķetes fonta izmēru
 st.markdown(
     """
     <style>
-    /* Palielina radio pogu etiķetes fonta izmēru */
     div[data-testid="stRadio"] label > div {
         font-size: 24px;
     }
@@ -268,7 +267,6 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username_logged = username
             log_user_login(username)
-            # Noklusējumā pārslēdzamies uz "Zīmēt poligonu"
             st.session_state['input_option'] = translations[language]["methods"][1]
         else:
             st.error(translations[language]["error_login"])
@@ -386,7 +384,6 @@ def read_dxf_to_geodataframe(dxf_file_path):
                 vertices_2d = to_2d(vertices)
                 geometries.append(Polygon(vertices_2d))
 
-        # Apvieno lineārās ģeometrijas poligonos, ja iespējams
         lines = [geom for geom in geometries if isinstance(geom, LineString)]
         if lines:
             multiline = linemerge(lines)
@@ -459,7 +456,6 @@ def process_input(input_data, input_method):
         }
 
         if input_method in ['upload', 'drawn']:
-            # input_data šeit ir GeoDataFrame
             polygon_gdf = input_data.to_crs(epsg=3059)
             minx, miny, maxx, maxy = polygon_gdf.total_bounds
             geometry = {
@@ -477,7 +473,6 @@ def process_input(input_data, input_method):
                 'outSR': '3059',
             })
         elif input_method in ['code', 'code_with_adjacent']:
-            # input_data šeit ir saraksts ar koda vērtībām
             codes = input_data
             sanitized_codes = [code.strip().replace("'", "''") for code in codes]
             codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
@@ -511,7 +506,6 @@ def process_input(input_data, input_method):
             st.session_state['data_ready'] = False
             return
 
-        # Apstrāde atšķiras atkarībā no ievades veida
         if input_method in ['upload', 'drawn']:
             arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
             if arcgis_gdf.crs is None:
@@ -529,7 +523,6 @@ def process_input(input_data, input_method):
             missing_codes = set(codes) - set(filtered_gdf['code'].unique())
 
         if input_method == 'code_with_adjacent':
-            # Iegūstam filtrētos datus
             filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
             if filtered_gdf.crs is None:
                 filtered_gdf.crs = "EPSG:3059"
@@ -612,7 +605,6 @@ def process_input(input_data, input_method):
 
             progress_bar.progress(90)
 
-            # Ierobežojam faila nosaukuma garumu
             max_codes_in_filename = 5
             if len(codes) > max_codes_in_filename:
                 display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -652,7 +644,6 @@ def process_input(input_data, input_method):
             progress_text.empty()
             progress_bar.progress(100)
         else:
-            # Ja ievades veids ir 'upload' vai 'drawn', izmantojam arcgis_gdf
             st.session_state['joined_gdf'] = arcgis_gdf
             st.session_state['data_ready'] = True
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
@@ -681,17 +672,16 @@ def display_map_with_results():
                      else "Cadastral identifier:")
 
     if input_method in ['upload', 'drawn']:
-        polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
-        folium.GeoJson(
-            polygon_gdf,
-            name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-            style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
-        ).add_to(m)
-
+        if 'polygon_gdf' in st.session_state:
+            polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
+            folium.GeoJson(
+                polygon_gdf,
+                name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
+                style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
+            ).add_to(m)
+        else:
+            st.info("Nav saglabāts ievades poligons.")
     elif input_method == 'code_with_adjacent':
-        pass
-
-    if input_method == 'code_with_adjacent':
         codes = st.session_state['base_file_name'].split('_')
         if '_codi' in codes[-1]:
             codes = codes[:-1]
@@ -985,7 +975,7 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
+#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu
 # =============================================================================
 def geocode_address(address_text):
     if not address_text:
@@ -1125,6 +1115,7 @@ def show_main_app():
                         polygon_gdf = None
 
             if 'polygon_gdf' in locals() and polygon_gdf is not None:
+                st.session_state['polygon_gdf'] = polygon_gdf  # Saglabājam polygon_gdf Session State
                 process_input(polygon_gdf, input_method='upload')
                 if st.session_state.get('data_ready', False):
                     st.success("Dati veiksmīgi iegūti!")
@@ -1249,6 +1240,7 @@ def show_main_app():
                         [last_drawing],
                         crs='EPSG:4326'
                     )
+                    st.session_state['polygon_gdf'] = polygon_gdf  # Saglabājam uzzīmēto poligonu
                     process_input(polygon_gdf, input_method='drawn')
                     if st.session_state.get('data_ready', False):
                         st.success("Dati veiksmīgi iegūti!")
