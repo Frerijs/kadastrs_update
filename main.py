@@ -33,7 +33,7 @@ supabase_key = (
 
 # Konstantas
 APP_NAME = "Kadastrs"
-APP_VERSION = "3.0"
+APP_VERSION = "4.0"
 APP_TYPE = "web"
 
 # Tulkošanas vārdnīca
