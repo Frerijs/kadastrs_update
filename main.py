@@ -83,7 +83,6 @@ translations = {
         "methods": [
             "Upload a pre-prepared closed contour file in .DXF or .SHP format",
             "Draw a closed contour on the map",
-            // Pārējās metodes tiek ignorētas
             "Enter one or more cadastral numbers and obtain data",
             "Enter one or more cadastral numbers and obtain data for both the specified cadastral numbers and adjacent ones"
         ],
