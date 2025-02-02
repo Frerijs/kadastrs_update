@@ -80,7 +80,7 @@ translations = {
         "search_address": "Meklēt adresi",
         "search_button": "Meklēt",
         "search_error": "Neizdevās atrast adresi.",
-        "enter_codes_label": "Ievadiet kadastra numuru (us) piemēdam (84960050005, 84960050049):",
+        "enter_codes_label": "Ievadiet kadastra numuru (us) (piemērs: 84960050005, 84960050049):",
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti kadastra numuri. Lūdzu, ievadiet vienu vai vairākus kadastra numursus.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem kadastra numuriem.",
