@@ -478,9 +478,7 @@ def process_input(input_data, input_method):
                 'inSR': '3059',
                 'outSR': '3059',
             })
-        # Ja ievade ir kadastra numuri (code vai code_with_adjacent)
         elif input_method in ['code', 'code_with_adjacent']:
-            # Šeit definējam mainīgo codes, kas ir iegūts no input_data (list)
             codes = input_data  
             sanitized_codes = [code.replace("'", "''") for code in codes]
             codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
@@ -533,19 +531,16 @@ def process_input(input_data, input_method):
                 filtered_gdf = filtered_gdf.to_crs(epsg=3059)
             progress_bar.progress(60)
 
-        # Noteicam, kuri numuri nav atrasti
         if input_method in ['code', 'code_with_adjacent']:
             missing_codes = set(codes) - set(filtered_gdf['code'].unique())
 
         if input_method == 'code_with_adjacent':
-            # Iegūstam filtrētos 'code'
             filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
             if filtered_gdf.crs is None:
                 filtered_gdf.crs = "EPSG:3059"
             else:
                 filtered_gdf = filtered_gdf.to_crs(epsg=3059)
 
-            # Tagad iegūstam pieskarošos poligonus
             filtered_geometries = filtered_gdf.geometry.tolist()
             union_geometry = unary_union(filtered_geometries)
 
@@ -621,7 +616,6 @@ def process_input(input_data, input_method):
                 joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
             progress_bar.progress(90)
 
-            # Ierobežojam faila nosaukuma garumu
             max_codes_in_filename = 5
             if len(codes) > max_codes_in_filename:
                 display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -689,7 +683,6 @@ def display_map_with_results():
                 style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
             ).add_to(m)
 
-    # Attēlojam ArcGIS iegūtos datus
     folium.GeoJson(
         joined_gdf,
         name=('Kadastra dati' if language=="Latviešu" else 'Cadastral data'),
@@ -1207,10 +1200,13 @@ def show_main_app():
             if submit_button:
                 if output and 'all_drawings' in output and output['all_drawings']:
                     last_drawing = output['all_drawings'][-1]
-                    polygon_gdf = gpd.GeoDataFrame.from_features(
-                        [last_drawing],
-                        crs='EPSG:4326'
-                    )
+                    # Pārliecināmies, ka zīmētais poligons ir "aizvērts"
+                    if last_drawing['geometry']['type'] == 'Polygon':
+                        coords = last_drawing['geometry']['coordinates'][0]
+                        if coords[0] != coords[-1]:
+                            coords.append(coords[0])
+                            last_drawing['geometry']['coordinates'][0] = coords
+                    polygon_gdf = gpd.GeoDataFrame.from_features([last_drawing], crs='EPSG:4326')
                     process_input(polygon_gdf, input_method='drawn')
                     if st.session_state.get('data_ready', False):
                         st.success("Dati veiksmīgi iegūti!")
