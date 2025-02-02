@@ -456,6 +456,7 @@ def process_input(input_data, input_method):
         }
 
         if input_method in ['upload', 'drawn']:
+            # Pārvēršam ievades poligonu uz EPSG:3059
             polygon_gdf = input_data.to_crs(epsg=3059)
             minx, miny, maxx, maxy = polygon_gdf.total_bounds
             geometry = {
@@ -513,7 +514,11 @@ def process_input(input_data, input_method):
             else:
                 arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
             progress_bar.progress(60)
-            # Saglabājam rezultātu GeoDataFrame arī upload/drawn gadījumos
+            # Ja ievades metode ir "upload", atlasām tikai tos poligonus, kuri peskaras (touch)
+            if input_method == 'upload':
+                input_union = unary_union(polygon_gdf.geometry)
+                arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.touches(input_union))]
+            # Saglabājam rezultātu arī upload/drawn gadījumos
             st.session_state['joined_gdf'] = arcgis_gdf
             st.session_state['data_ready'] = True
             current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
