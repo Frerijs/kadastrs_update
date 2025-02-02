@@ -75,65 +75,65 @@ translations = {
         "preparing_csv": "4. Sagatavo CSV failu...",
         "preparing_all_csv": "5. Sagatavo VISU CSV failu...",
         "preparing_all_excel": "6. Sagatavo VISU EXCEL failu...",
-        "warning_code_missing": "Kadastra numurs nav pieejams datos. Teksts netiks pievienots DXF failā.",
+        "warning_code_missing": 'Kadastra numurs nav pieejama datos. Teksts netiks pievienots DXF failā.',
         "instructions": "Instrukcija",
         "search_address": "Meklēt adresi",
         "search_button": "Meklēt",
         "search_error": "Neizdevās atrast adresi.",
         "enter_codes_label": "Ievadiet kadastra numuru (us) (piemērs: 84960050005, 84960050049):",
         "process_codes_button": "Apstrādāt kodus",
-        "error_no_codes_entered": "Nav ievadīti kadastra numuri. Lūdzu, ievadiet vienu vai vairākus kadastra numurus.",
+        "error_no_codes_entered": "Nav ievadīti kadastra numuri. Lūdzu, ievadiet vienu vai vairākus kadastra numursus.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem kadastra numuriem.",
         "info_code_filter": "Dati tiek iegūti gan par norādītajiem kadastra numuriem un pieskarošajiem."
     },
     "English": {
-        "radio_label": "Choose a method to obtain data:",
-        "methods": [
-            "Upload a pre-prepared closed contour file in .DXF or .SHP format",
-            "Draw a closed contour on the map",
-            "Enter one or more cadastral numbers and obtain data",
-            "Enter one or more cadastral numbers and obtain data for both the specified cadastral numbers and adjacent ones"
-        ],
-        "title": "Download Cadastral Designation List (ZV Boundaries and Designations)",
-        "language_label": "Language",
-        "upload_instruction": "Upload a closed contour or multiple contours in one of the supported file formats:",
-        "upload_files_label": "Upload the required files:",
-        "draw_instruction": "Draw a closed contour on the map and press the 'Get Data' button.",
-        "get_data_button": "Get Data",
-        "download_geojson": "Download data in GeoJSON format",
-        "download_shapefile": "Download data in Shapefile format (ZIP)",
-        "download_dxf": "Download data in DXF format",
-        "download_csv": "Download land unit list in CSV format",
-        "download_all_csv": "Download ALL data in CSV format",
-        "download_all_excel": "Download ALL data in EXCEL format",
-        "logout": "Logout",
-        "success_logout": "Successfully logged out of the account.",
-        "error_authenticate": "Error authenticating user: {status_code}",
-        "error_login": "Incorrect username or password.",
-        "error_upload_dxf": "No valid geometries found in the DXF file.",
-        "error_upload_shp": "No .shp file found among the uploaded files.",
-        "error_no_data_download": "No data available for download.",
-        "error_display_pdf": "Error: {error}",
-        "info_upload": "Please upload a polygon file.",
-        "info_draw": "Please draw a polygon on the map.",
-        "info_enter_code": "Please enter one or more cadastral numbers, separated by commas.",
-        "preparing_geojson": "1. Preparing GeoJSON file...",
-        "preparing_shapefile": "2. Preparing Shapefile ZIP file...",
-        "preparing_dxf": "3. Preparing DXF file...",
-        "preparing_csv": "4. Preparing CSV file...",
-        "preparing_all_csv": "5. Preparing ALL CSV file...",
-        "preparing_all_excel": "6. Preparing ALL EXCEL file...",
-        "warning_code_missing": "Cadastral number is not available in the data. The text will not be added to the DXF file.",
-        "instructions": "Instructions",
-        "search_address": "Search address",
-        "search_button": "Search",
-        "search_error": "Failed to find the address.",
-        "enter_codes_label": "Enter cadastral number(s) (e.g.: 84960050005, 84960050049):",
-        "process_codes_button": "Process codes",
-        "error_no_codes_entered": "No cadastral numbers entered. Please enter one or more cadastral numbers.",
-        "error_no_data_found": "No data found for the specified cadastral numbers.",
-        "info_code_filter": "Data is obtained for both the specified cadastral numbers and adjacent ones."
-    }
+    "radio_label": "Choose a method to obtain data:",
+    "methods": [
+        "Upload a pre-prepared closed contour file in .DXF or .SHP format",
+        "Draw a closed contour on the map",
+        "Enter one or more cadastral numbers and obtain data",
+        "Enter one or more cadastral numbers and obtain data for both the specified cadastral numbers and adjacent ones"
+    ],
+    "title": "Download Cadastral Designation List (ZV Boundaries and Designations)",
+    "language_label": "Language",
+    "upload_instruction": "Upload a closed contour or multiple contours in one of the supported file formats:",
+    "upload_files_label": "Upload the required files:",
+    "draw_instruction": "Draw a closed contour on the map and press the 'Get Data' button.",
+    "get_data_button": "Get Data",
+    "download_geojson": "Download data in GeoJSON format",
+    "download_shapefile": "Download data in Shapefile format (ZIP)",
+    "download_dxf": "Download data in DXF format",
+    "download_csv": "Download land unit list in CSV format",
+    "download_all_csv": "Download ALL data in CSV format",
+    "download_all_excel": "Download ALL data in EXCEL format",
+    "logout": "Logout",
+    "success_logout": "Successfully logged out of the account.",
+    "error_authenticate": "Error authenticating user: {status_code}",
+    "error_login": "Incorrect username or password.",
+    "error_upload_dxf": "No valid geometries found in the DXF file.",
+    "error_upload_shp": "No .shp file found among the uploaded files.",
+    "error_no_data_download": "No data available for download.",
+    "error_display_pdf": "Error: {error}",
+    "info_upload": "Please upload a polygon file.",
+    "info_draw": "Please draw a polygon on the map.",
+    "info_enter_code": "Please enter one or more cadastral numbers, separated by commas.",
+    "preparing_geojson": "1. Preparing GeoJSON file...",
+    "preparing_shapefile": "2. Preparing Shapefile ZIP file...",
+    "preparing_dxf": "3. Preparing DXF file...",
+    "preparing_csv": "4. Preparing CSV file...",
+    "preparing_all_csv": "5. Preparing ALL CSV files...",
+    "preparing_all_excel": "6. Preparing ALL EXCEL files...",
+    "warning_code_missing": "Cadastral number is not available in the data. The text will not be added to the DXF file.",
+    "instructions": "Instructions",
+    "search_address": "Search address",
+    "search_button": "Search",
+    "search_error": "Failed to find the address.",
+    "enter_codes_label": "Enter cadastral number(s):",
+    "process_codes_button": "Process codes",
+    "error_no_codes_entered": "No cadastral numbers entered. Please enter one or more cadastral numbers.",
+    "error_no_data_found": "No data found for the specified cadastral numbers.",
+    "info_code_filter": "Data is obtained for both the specified cadastral numbers and adjacent ones."
+   }
 }
 
 st.set_page_config(
@@ -141,7 +141,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Palielinām radio pogu etiķetes fonta izmēru
+# Palielinām radio pogu etiķetes fontu
 st.markdown(
     """
     <style>
@@ -294,7 +294,7 @@ def show_login():
     )
 
 # =============================================================================
-#  PDF attēlošanai (ja vajadzīgs)
+# PDF attēlošanai (ja vajadzīgs)
 # =============================================================================
 def display_pdf(file_path):
     try:
@@ -397,8 +397,7 @@ def read_dxf_to_geodataframe(dxf_file_path):
         if polygons:
             unified_geometry = unary_union(polygons)
         else:
-            st.error(translations[language]["error_upload_dxf"])
-            return gpd.GeoDataFrame()
+            unified_geometry = None
 
         if unified_geometry:
             return gpd.GeoDataFrame(geometry=[unified_geometry], crs="EPSG:3059")
@@ -433,7 +432,7 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         )
 
 # =============================================================================
-#  Apstrādā ievadi (poligons vai koda masīvs) – izmantojot ArcGIS FeatureServer
+#  Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
 # =============================================================================
 def process_input(input_data, input_method):
     try:
@@ -456,14 +455,13 @@ def process_input(input_data, input_method):
             'outFields': '*',
             'returnGeometry': 'true',
             'outSR': '3059',
-            'spatialRel': 'esriSpatialRelIntersects',
+            'spatialRel': 'esriSpatialRelIntersects',  # Pārslēdzam uz Intersects
         }
 
-        # Ja ievade ir poligons (upload, drawn)
         if input_method in ['upload', 'drawn']:
             polygon_gdf = input_data.to_crs(epsg=3059)
-            st.session_state['polygon_gdf'] = polygon_gdf  # Saglabājam ievades poligonu attēlošanai
             minx, miny, maxx, maxy = polygon_gdf.total_bounds
+            # ESRI REST API expects geometry as a JSON string
             geometry = {
                 "xmin": minx,
                 "ymin": miny,
@@ -479,16 +477,13 @@ def process_input(input_data, input_method):
                 'outSR': '3059',
             })
         elif input_method in ['code', 'code_with_adjacent']:
-            codes = input_data  
-            sanitized_codes = [code.replace("'", "''") for code in codes]
+            codes = input_data
+            # Sanitize and format codes for SQL IN clause
+            sanitized_codes = [code.strip().replace("'", "''") for code in codes]
             codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
             params.update({
                 'where': f"code IN ({codes_str})"
             })
-        else:
-            st.error("Nepareiza ievades metode")
-            st.session_state['data_ready'] = False
-            return
 
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
         progress_bar.progress(20)
@@ -496,18 +491,20 @@ def process_input(input_data, input_method):
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
-            st.write("API Atbilde:", resp.text)
+            st.write("API Atbilde:", resp.text)  # Pievienojam šo, lai redzētu API atbildi
             st.session_state['data_ready'] = False
             return
         progress_bar.progress(30)
 
         esri_data = resp.json()
 
+        # Pārbaudām, vai atbilde satur 'features' atslēgu un vai tās nav tukšas
         if 'features' not in esri_data or not esri_data['features']:
             st.error(translations[language]["error_no_data_found"])
             st.session_state['data_ready'] = False
             return
 
+        # Pārvēršam ESRI GeoJSON formātā
         geojson_data = arcgis2geojson(esri_data)
         progress_bar.progress(50)
 
@@ -531,25 +528,28 @@ def process_input(input_data, input_method):
                 filtered_gdf = filtered_gdf.to_crs(epsg=3059)
             progress_bar.progress(60)
 
-        if input_method in ['code', 'code_with_adjacent']:
-            missing_codes = set(codes) - set(filtered_gdf['code'].unique())
+        missing_codes = set(codes) - set(filtered_gdf['code'].unique())
 
         if input_method == 'code_with_adjacent':
+            # Pirma iegūstam filtrētos 'code'
             filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
             if filtered_gdf.crs is None:
                 filtered_gdf.crs = "EPSG:3059"
             else:
                 filtered_gdf = filtered_gdf.to_crs(epsg=3059)
 
+            # Tagad iegūstam pieskarošos poligonus
+            # Sagatavojam vajadzīgo GeoDataFrame (viena vai vairākas geometrijas)
             filtered_geometries = filtered_gdf.geometry.tolist()
             union_geometry = unary_union(filtered_geometries)
 
+            # Izveidojam pareizu ģeometrijas formātu
             adjacent_params = {
                 'f': 'json',
                 'outFields': '*',
                 'returnGeometry': 'true',
                 'outSR': '3059',
-                'spatialRel': 'esriSpatialRelIntersects',
+                'spatialRel': 'esriSpatialRelIntersects',  # Pārslēdzam uz Intersects
                 'geometry': json.dumps({
                     "xmin": union_geometry.bounds[0],
                     "ymin": union_geometry.bounds[1],
@@ -566,17 +566,19 @@ def process_input(input_data, input_method):
             resp_adjacent = requests.get(adjacent_query_url)
             if resp_adjacent.status_code != 200:
                 st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
-                st.write("API Atbilde:", resp_adjacent.text)
+                st.write("API Atbilde:", resp_adjacent.text)  # Redzam API atbildi
                 st.session_state['data_ready'] = False
                 return
 
             esri_adjacent_data = resp_adjacent.json()
 
+            # Pārbaudām, vai atbilde satur 'features' atslēgu un vai tās nav tukšas
             if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
                 st.error(translations[language]["error_no_data_found"])
                 st.session_state['data_ready'] = False
                 return
 
+            # Pārvēršam ESRI GeoJSON formātā
             geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
             progress_bar.progress(70)
 
@@ -591,9 +593,11 @@ def process_input(input_data, input_method):
             else:
                 adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
 
+            # Papildu filtrēšana, lai iegūtu tikai pieskarošos poligonus
             filtered_union = unary_union(filtered_gdf.geometry)
             adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(filtered_union)]
 
+            # Ja pēc filtrēšanas nav pieskarošos poligonu, parādām paziņojumu
             if adjacent_gdf.empty:
                 st.warning(translations[language]["error_no_data_found"])
                 st.session_state['data_ready'] = False
@@ -601,7 +605,9 @@ def process_input(input_data, input_method):
 
             progress_bar.progress(80)
 
+            # Apvienojam filtrētos un pieskarošos poligonus
             combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
+
             joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
 
             progress_bar.progress(90)
@@ -616,6 +622,7 @@ def process_input(input_data, input_method):
                 joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
             progress_bar.progress(90)
 
+            # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
             max_codes_in_filename = 5
             if len(codes) > max_codes_in_filename:
                 display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -623,6 +630,7 @@ def process_input(input_data, input_method):
                 display_codes = "_".join(codes)
             st.session_state['base_file_name'] = display_codes
 
+            # Noteicam, kuri code nav atrasti
             if missing_codes:
                 st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
 
@@ -636,8 +644,10 @@ def process_input(input_data, input_method):
             progress_bar.progress(100)
 
         elif input_method == 'code':
+            # Ja ir input_method 'code', tikai filtrēto datus
             joined_gdf = filtered_gdf.copy()
 
+            # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
             max_codes_in_filename = 5
             if len(codes) > max_codes_in_filename:
                 display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -645,6 +655,7 @@ def process_input(input_data, input_method):
                 display_codes = "_".join(codes)
             st.session_state['base_file_name'] = display_codes
 
+            # Noteicam, kuri code nav atrasti
             if missing_codes:
                 st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
 
@@ -662,7 +673,7 @@ def process_input(input_data, input_method):
         st.session_state['data_ready'] = False
 
 # =============================================================================
-#  Attēlot kartē rezultātus (zilos poligonus) un ievadīto poligonu/kodu
+#  Attēlot kartē rezultātus (zilos poligonus) un ievadīto poligonu vai kodus
 # =============================================================================
 def display_map_with_results():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -673,22 +684,53 @@ def display_map_with_results():
     input_method = st.session_state.get('input_method', 'drawn')
 
     m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
+    tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu"
+                     else "Cadastral identifier:")
 
     if input_method in ['upload', 'drawn']:
-        if 'polygon_gdf' in st.session_state:
-            polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
+        polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
+        folium.GeoJson(
+            polygon_gdf,
+            name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
+            style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
+        ).add_to(m)
+
+    elif input_method == 'code_with_adjacent':
+        # Ja nepieciešams, var atšķirt filtrētos un pieskarošos poligonus
+        pass
+
+    # Atšķirīgi attēlojam filtrētos un pieskarošos poligonus
+    if input_method == 'code_with_adjacent':
+        # Iegūstam filtrētos kodus
+        codes = st.session_state['base_file_name'].split('_')
+        # Ja display_codes satur papildus informāciju, atdalām to
+        if '_codi' in codes[-1]:
+            codes = codes[:-1]
+        filtered_gdf = st.session_state['joined_gdf'][st.session_state['joined_gdf']['code'].isin(codes)]
+        adjacent_gdf = st.session_state['joined_gdf'][~st.session_state['joined_gdf']['code'].isin(codes)]
+
+        if not filtered_gdf.empty:
             folium.GeoJson(
-                polygon_gdf,
-                name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-                style_function=lambda x: {'fillColor': 'none', 'color': 'red'}
+                filtered_gdf,
+                name=('Filtrētie kadastra numuri' if language == "Latviešu" else 'Filtered "code"'),
+                tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+                style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
             ).add_to(m)
 
-    folium.GeoJson(
-        joined_gdf,
-        name=('Kadastra dati' if language=="Latviešu" else 'Cadastral data'),
-        tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[('Kadastra apzīmējums:' if language=="Latviešu" else "Cadastral identifier:")]),
-        style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
-    ).add_to(m)
+        if not adjacent_gdf.empty:
+            folium.GeoJson(
+                adjacent_gdf,
+                name=('Pieskarošie kadastra numuri' if language == "Latviešu" else 'Adjacent polygons'),
+                tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+                style_function=lambda x: {'color': 'green', 'fillOpacity': 0.1}
+            ).add_to(m)
+    else:
+        folium.GeoJson(
+            joined_gdf,
+            name=('Kadastra dati' if language == "Latviešu" else 'Cadastral data'),
+            tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+            style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1}
+        ).add_to(m)
 
     folium.LayerControl().add_to(m)
     if not joined_gdf.empty:
@@ -881,7 +923,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 4) CSV (tikai kopsavilkums)
+        # 4) CSV (tikai code)
         try:
             progress_text.text(translations[language].get("preparing_csv", "4. Sagatavo CSV failu..."))
             if 'code' in joined_gdf.columns:
@@ -954,9 +996,14 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – ja nepieciešams
+#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu – bez DEBUG izdrukām
 # =============================================================================
 def geocode_address(address_text):
+    """
+    Vaicā Nominatim ar parametru polygon_geojson=1, lai iegūtu
+    gan lat/lon, gan poligona robežu (ja pieejams).
+    Atgriež (lat, lon, polygon_geojson, bounding_box) vai (None, None, None, None) ja nav atrasts.
+    """
     if not address_text:
         return None, None, None, None
     try:
@@ -965,7 +1012,7 @@ def geocode_address(address_text):
             "format": "json",
             "q": address_text,
             "limit": 5,
-            "polygon_geojson": 1
+            "polygon_geojson": 1  # lai dabūtu robežu GeoJSON
         }
         headers = {
             "User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"
@@ -978,7 +1025,7 @@ def geocode_address(address_text):
             lat = float(data[0]["lat"])
             lon = float(data[0]["lon"])
             poly_geojson = data[0].get("geojson")
-            bbox = data[0].get("boundingbox")
+            bbox = data[0].get("boundingbox")  # [s,n,w,e]
             return lat, lon, poly_geojson, bbox
         else:
             return None, None, None, None
@@ -1004,6 +1051,9 @@ def show_main_app():
         )
 
     st.title(translations[language]["title"])
+    default_location = [56.946285, 24.105078]
+
+    radio_label = translations[language]["radio_label"]
     methods = translations[language]["methods"]
 
     if 'input_option' not in st.session_state:
@@ -1012,15 +1062,17 @@ def show_main_app():
         st.session_state['previous_option'] = methods[1]
 
     input_option = st.radio(
-        label=translations[language]["radio_label"],
+        label=radio_label,
         options=methods,
         index=methods.index(st.session_state['input_option']) if st.session_state['input_option'] in methods else 1
     )
 
+    # Ja mainās ievades metode, notīrām starpstadijas
     if st.session_state['previous_option'] != input_option:
         keys_to_reset = [
             'joined_gdf', 'polygon_gdf', 'data_ready',
-            'base_file_name', 'processing_date', 'input_method', 'missing_codes'
+            'base_file_name', 'processing_date', 'input_method',
+            'missing_codes'
         ]
         for key in keys_to_reset:
             if key in st.session_state:
@@ -1029,8 +1081,10 @@ def show_main_app():
 
     st.session_state['input_option'] = input_option
 
-    # 1) Augšupielādēt SHP/DXF
-    if st.session_state['input_option'] == methods[0]:
+    # =========================================================================
+    #  1) Augšupielādēt SHP/DXF
+    # =========================================================================
+    if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
         st.markdown(
             f"""
@@ -1053,7 +1107,11 @@ def show_main_app():
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
 
-                dxf_files = [os.path.join(tmpdirname, f.name) for f in uploaded_files if f.name.lower().endswith('.dxf')]
+                # Meklē, vai ir .dxf
+                dxf_files = [
+                    os.path.join(tmpdirname, f.name)
+                    for f in uploaded_files if f.name.lower().endswith('.dxf')
+                ]
                 if dxf_files:
                     polygon_dxf = dxf_files[0]
                     polygon_gdf = read_dxf_to_geodataframe(polygon_dxf)
@@ -1064,10 +1122,16 @@ def show_main_app():
                         base_file_name = os.path.splitext(os.path.basename(dxf_files[0]))[0]
                         st.session_state['base_file_name'] = base_file_name
                 else:
+                    # Pretējā gadījumā mēģinām SHP
                     required_extensions = ['.shp', '.shx', '.dbf']
-                    uploaded_extensions = [os.path.splitext(f.name)[1].lower() for f in uploaded_files]
+                    uploaded_extensions = [
+                        os.path.splitext(f.name)[1].lower() for f in uploaded_files
+                    ]
                     if all(ext in uploaded_extensions for ext in required_extensions):
-                        shp_files = [os.path.join(tmpdirname, f.name) for f in uploaded_files if f.name.lower().endswith('.shp')]
+                        shp_files = [
+                            os.path.join(tmpdirname, f.name)
+                            for f in uploaded_files if f.name.lower().endswith('.shp')
+                        ]
                         if shp_files:
                             polygon_shp = shp_files[0]
                             polygon_gdf = gpd.read_file(polygon_shp)
@@ -1078,31 +1142,34 @@ def show_main_app():
                             polygon_gdf = None
                     else:
                         st.error(translations[language]["error_display_pdf"].format(
-                            error="Lūdzu, augšupielādējiet poligonu formātā DXF vai SHP."
+                            error="Please upload the polygon in one of the selected file formats: DXF or SHP."
                         ))
                         polygon_gdf = None
 
-            if polygon_gdf is not None:
+            if 'polygon_gdf' in locals() and polygon_gdf is not None:
                 process_input(polygon_gdf, input_method='upload')
                 if st.session_state.get('data_ready', False):
                     st.success("Dati veiksmīgi iegūti!")
             else:
                 st.error(translations[language]["error_display_pdf"].format(
-                    error="Neizdevās ielādēt poligonu no faila."
+                    error="Could not load polygon from file."
                 ))
-                m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
+                m = folium.Map(location=default_location, zoom_start=7)
                 with map_placeholder:
                     st_folium(m, width=700, height=500, key='upload_map')
         else:
             st.info(translations[language]["info_upload"])
-            m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
+            m = folium.Map(location=default_location, zoom_start=7)
             with st.empty():
                 st_folium(m, width=700, height=500, key='upload_map')
 
-    # 2) Zīmēt poligonu
+   # =========================================================================
+    #  2) Zīmēt poligonu
+    # =========================================================================
     elif st.session_state['input_option'] == methods[1]:
         st.info(translations[language]["draw_instruction"])
 
+        # Saglabājam/atjaunojam kartes centru SessionState
         if 'map_center' not in st.session_state:
             st.session_state['map_center'] = [56.946285, 24.105078]
         if 'found_geometry' not in st.session_state:
@@ -1126,6 +1193,7 @@ def show_main_app():
                     label=translations[language]["get_data_button"]
                 )
 
+            # Adreses meklēšana (pēc izvēles)
             if search_button and address_text.strip():
                 lat, lon, poly_geojson, bbox = geocode_address(address_text.strip())
                 if lat is not None and lon is not None:
@@ -1133,11 +1201,12 @@ def show_main_app():
                     st.session_state['found_geometry'] = poly_geojson
                     st.session_state['found_bbox'] = bbox
                 else:
-                    st.warning(translations[language]["search_error"])
+                    st.warning("Neizdevās atrast adresi.")
 
             current_lat, current_lon = st.session_state['map_center']
             m = folium.Map(location=[current_lat, current_lon], zoom_start=10)
 
+            # Pievienojam papildu WMS slāņus (pēc izvēles)
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
             add_wms_layer(
                 map_obj=m,
@@ -1194,19 +1263,17 @@ def show_main_app():
             folium.LayerControl().add_to(m)
             m.get_root().add_child(CustomDeleteButton())
 
+            # Dinamiska key, lai karte atjaunotu
             map_key = f"draw_map_{current_lat:.5f}_{current_lon:.5f}"
             output = st_folium(m, width=700, height=500, key=map_key)
 
             if submit_button:
                 if output and 'all_drawings' in output and output['all_drawings']:
                     last_drawing = output['all_drawings'][-1]
-                    # Pārliecināmies, ka zīmētais poligons ir "aizvērts"
-                    if last_drawing['geometry']['type'] == 'Polygon':
-                        coords = last_drawing['geometry']['coordinates'][0]
-                        if coords[0] != coords[-1]:
-                            coords.append(coords[0])
-                            last_drawing['geometry']['coordinates'][0] = coords
-                    polygon_gdf = gpd.GeoDataFrame.from_features([last_drawing], crs='EPSG:4326')
+                    polygon_gdf = gpd.GeoDataFrame.from_features(
+                        [last_drawing],
+                        crs='EPSG:4326'
+                    )
                     process_input(polygon_gdf, input_method='drawn')
                     if st.session_state.get('data_ready', False):
                         st.success("Dati veiksmīgi iegūti!")
@@ -1214,8 +1281,25 @@ def show_main_app():
                 else:
                     st.error(translations[language]["info_draw"])
 
-    # 3) Ievadiet kadastra numurus
-    elif st.session_state['input_option'] == methods[2]:
+    # Ja ir dati, parādām karti un lejupielādes pogas
+    if st.session_state.get('data_ready', False):
+        display_map_with_results()
+        display_download_buttons()
+
+    # Poga "Iziet"
+    if st.button(translations[language]["logout"]):
+        st.session_state.clear()
+        st.success(translations[language]["success_logout"])
+
+    st.markdown(
+        "<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>",
+        unsafe_allow_html=True
+    )
+
+    # =========================================================================
+    #  3) Ievadīt 'code'
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][2]:
         st.info(translations[language]["info_enter_code"])
 
         with st.form(key='code_form'):
@@ -1231,10 +1315,13 @@ def show_main_app():
                 if not codes_input.strip():
                     st.error(translations[language]["error_no_codes_entered"])
                 else:
+                    # Split codes by comma and strip whitespace
                     codes = [code.strip() for code in codes_input.split(',') if code.strip()]
                     if not codes:
                         st.error(translations[language]["error_no_codes_entered"])
                     else:
+                        # Set a base_file_name based on entered codes
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
                         max_codes_in_filename = 5
                         if len(codes) > max_codes_in_filename:
                             display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -1242,14 +1329,18 @@ def show_main_app():
                             display_codes = "_".join(codes)
                         st.session_state['base_file_name'] = display_codes
 
+                        # Process input
                         process_input(codes, input_method='code')
 
+        # Ja ir iepriekš apstrādāti dati, parādām karti
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code':
             display_map_with_results()
             display_download_buttons()
 
-    # 4) Ievadiet kadastra numurus un iegūstiet datus arī par pieskarošiem poligoniem
-    elif st.session_state['input_option'] == methods[3]:
+    # =========================================================================
+    #  4) Ievadīt 'code' un iegūt datus par pieskarošiem poligoniem
+    # =========================================================================
+    elif st.session_state['input_option'] == translations[language]["methods"][3]:
         st.info(translations[language]["info_code_filter"])
 
         with st.form(key='code_with_adjacent_form'):
@@ -1265,10 +1356,13 @@ def show_main_app():
                 if not codes_input.strip():
                     st.error(translations[language]["error_no_codes_entered"])
                 else:
+                    # Split codes by comma and strip whitespace
                     codes = [code.strip() for code in codes_input.split(',') if code.strip()]
                     if not codes:
                         st.error(translations[language]["error_no_codes_entered"])
                     else:
+                        # Set a base_file_name based on entered codes
+                        # Ierobežojam faila nosaukuma garumu (pirmie 5 code + pārējie skaits)
                         max_codes_in_filename = 5
                         if len(codes) > max_codes_in_filename:
                             display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -1276,16 +1370,25 @@ def show_main_app():
                             display_codes = "_".join(codes)
                         st.session_state['base_file_name'] = display_codes
 
+                        # Process input
                         process_input(codes, input_method='code_with_adjacent')
 
+        # Ja ir iepriekš apstrādāti dati, parādām karti
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
             display_map_with_results()
             display_download_buttons()
 
-    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [methods[2], methods[3]]:
+    # =========================================================================
+    #  Ja ir dati no poligona vai kodiem
+    # =========================================================================
+    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
+        translations[language]["methods"][2],
+        translations[language]["methods"][3]
+    ]:
         display_map_with_results()
         display_download_buttons()
 
+    # Poga Iziet
     if st.button(translations[language]["logout"]):
         st.session_state.clear()
         st.success(translations[language]["success_logout"])
