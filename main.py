@@ -163,7 +163,7 @@ translations["Latviešu"]["language_label"],
 #  Pielāgots Leaflet kontrolis (dzēš poligonus)
 # =============================================================================
 class CustomDeleteButton(MacroElement):
-_template = Template("""
+template = Template("""
        {% macro script(this, kwargs) %}
            L.Control.DeleteButton = L.Control.extend({
                options: {
