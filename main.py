@@ -43,9 +43,6 @@ translations = {
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
-        ],
-        "radio_label": "Izvēlieties veidu, kā iegūt datus:",
-         "methods": [
             'Ievadiet vienu vai vairākus kadastra numurus un iegūstiet datus',
             'Ievadiet vienu vai vairākus kadastra numurus un iegūstiet datus gan par filtrētajiem kadastra numuriem, gan par pieskarošiem'
         ],
