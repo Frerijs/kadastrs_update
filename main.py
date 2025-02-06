@@ -1017,36 +1017,51 @@ def show_main_app():
         )
 
     st.title(translations[language]["title"])
-    default_location = [56.946285, 24.105078]
 
-    radio_label = translations[language]["radio_label"]
-    methods = translations[language]["methods"]
-
-    if 'input_option' not in st.session_state:
-        st.session_state['input_option'] = methods[1]
-    if 'previous_option' not in st.session_state:
-        st.session_state['previous_option'] = methods[1]
-
-    input_option = st.radio(
-        label=radio_label,
-        options=methods,
-        index=methods.index(st.session_state['input_option']) if st.session_state['input_option'] in methods else 1
+    # -------------------------------------------------------------------------
+    # Jaunais interfeiss ar divām kategorijām
+    # -------------------------------------------------------------------------
+    st.markdown("### Izvēlieties datu iegūšanas kategoriju:")
+    # Kategoriju izvēle: 
+    # "No poligona" – dati tiek iegūti, izmantojot poligona ievadi (augšupielāde vai zīmēšana)
+    # "Pēc kadastra numuriem" – dati tiek iegūti, ievadot kadastra numurus
+    method_category = st.radio(
+        label="",
+        options=["No poligona", "Pēc kadastra numuriem"],
+        index=0
     )
 
-    if st.session_state['previous_option'] != input_option:
-        keys_to_reset = [
-            'joined_gdf', 'polygon_gdf', 'data_ready',
-            'base_file_name', 'processing_date', 'input_method',
-            'missing_codes'
-        ]
-        for key in keys_to_reset:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.session_state['previous_option'] = input_option
+    # Atkarībā no izvēlētās kategorijas rādām attiecīgu radio pogu
+    if method_category == "No poligona":
+        st.markdown("#### Datu iegūšana no poligona:")
+        polygon_method = st.radio(
+            label="",
+            options=[
+                translations[language]["methods"][0],  # "Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā"
+                translations[language]["methods"][1]   # "Zīmējiet uz kartes noslēgtu kontūru"
+            ],
+            key="polygon_option"
+        )
+        # Saglabājam izvēlēto metodi kā 'input_option'
+        st.session_state['input_option'] = polygon_method
 
-    st.session_state['input_option'] = input_option
+    else:
+        st.markdown("#### Datu iegūšana pēc kadastra numuriem:")
+        cadastral_method = st.radio(
+            label="",
+            options=[
+                translations[language]["methods"][2],  # "Ievadiet vienu vai vairākus kadastra numurus un iegūstiet datus"
+                translations[language]["methods"][3]   # "Ievadiet vienu vai vairākus kadastra numurus un iegūstiet datus gan par filtrētajiem kadastra numuriem, gan par pieskarošiem"
+            ],
+            key="cadastral_option"
+        )
+        st.session_state['input_option'] = cadastral_method
 
+    # ----------------------------------------------------------------------------
+    # Pārējā lietotnes loģika – atkarībā no izvēlētās metodes tiek veikta attiecīgā darbība
+    # ----------------------------------------------------------------------------
     if st.session_state['input_option'] == translations[language]["methods"][0]:
+        # Datu iegūšana no augšupielādes (DXF/SHP)
         map_placeholder = st.empty()
         st.markdown(
             f"""
@@ -1102,7 +1117,7 @@ def show_main_app():
                             polygon_gdf = None
                     else:
                         st.error(translations[language]["error_display_pdf"].format(
-                            error="Please upload the polygon in one of the selected file formats: DXF or SHP."
+                            error="Lūdzu augšupielādējiet poligonu kā DXF vai SHP failu."
                         ))
                         polygon_gdf = None
 
@@ -1113,18 +1128,19 @@ def show_main_app():
                     st.success("Dati veiksmīgi iegūti!")
             else:
                 st.error(translations[language]["error_display_pdf"].format(
-                    error="Could not load polygon from file."
+                    error="Neizdevās nolasīt poligonu no faila."
                 ))
-                m = folium.Map(location=default_location, zoom_start=7)
+                m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
                 with map_placeholder:
                     st_folium(m, width=700, height=500, key='upload_map')
         else:
             st.info(translations[language]["info_upload"])
-            m = folium.Map(location=default_location, zoom_start=7)
+            m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
             with st.empty():
                 st_folium(m, width=700, height=500, key='upload_map')
 
     elif st.session_state['input_option'] == translations[language]["methods"][1]:
+        # Datu iegūšana, zīmējot poligonu uz kartes
         st.info(translations[language]["draw_instruction"])
 
         if 'map_center' not in st.session_state:
@@ -1240,10 +1256,15 @@ def show_main_app():
                 else:
                     st.error(translations[language]["info_draw"])
 
-    elif st.session_state['input_option'] == translations[language]["methods"][2]:
-        st.info(translations[language]["info_enter_code"])
+    elif st.session_state['input_option'] in [translations[language]["methods"][2], translations[language]["methods"][3]]:
+        # Datu iegūšana pēc kadastra numuriem (abos gadījumos)
+        if st.session_state['input_option'] == translations[language]["methods"][2]:
+            st.info(translations[language]["info_enter_code"])
+        else:
+            st.info(translations[language]["info_code_filter"])
 
-        with st.form(key='code_form'):
+        form_key = 'code_form' if st.session_state['input_option'] == translations[language]["methods"][2] else 'code_with_adjacent_form'
+        with st.form(key=form_key):
             codes_input = st.text_input(
                 label=translations[language]["enter_codes_label"],
                 value=""
@@ -1267,42 +1288,12 @@ def show_main_app():
                             display_codes = "_".join(codes)
                         st.session_state['base_file_name'] = display_codes
 
-                        process_input(codes, input_method='code')
-
-        if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code':
-            display_map_with_results()
-            display_download_buttons()
-
-    elif st.session_state['input_option'] == translations[language]["methods"][3]:
-        st.info(translations[language]["info_code_filter"])
-
-        with st.form(key='code_with_adjacent_form'):
-            codes_input = st.text_input(
-                label=translations[language]["enter_codes_label"],
-                value=""
-            )
-            process_codes = st.form_submit_button(
-                label=translations[language]["process_codes_button"]
-            )
-
-            if process_codes:
-                if not codes_input.strip():
-                    st.error(translations[language]["error_no_codes_entered"])
-                else:
-                    codes = [code.strip() for code in codes_input.split(',') if code.strip()]
-                    if not codes:
-                        st.error(translations[language]["error_no_codes_entered"])
-                    else:
-                        max_codes_in_filename = 5
-                        if len(codes) > max_codes_in_filename:
-                            display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
+                        if st.session_state['input_option'] == translations[language]["methods"][2]:
+                            process_input(codes, input_method='code')
                         else:
-                            display_codes = "_".join(codes)
-                        st.session_state['base_file_name'] = display_codes
+                            process_input(codes, input_method='code_with_adjacent')
 
-                        process_input(codes, input_method='code_with_adjacent')
-
-        if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
+        if st.session_state.get('data_ready', False):
             display_map_with_results()
             display_download_buttons()
 
