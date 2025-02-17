@@ -159,7 +159,7 @@ language = st.sidebar.selectbox(
 )
 
 # =============================================================================
-#  Pielāgots Leaflet kontrolis (dzēš poligonus)
+# Pielāgots Leaflet kontrolis (dzēš poligonus)
 # =============================================================================
 class CustomDeleteButton(MacroElement):
     _template = Template("""
@@ -201,7 +201,7 @@ class CustomDeleteButton(MacroElement):
         super().__init__()
 
 # =============================================================================
-#  Lietotāja autentifikācija (Supabase DEMO)
+# Lietotāja autentifikācija (Supabase DEMO)
 # =============================================================================
 def authenticate(username, password):
     try:
@@ -267,7 +267,6 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username_logged = username
             log_user_login(username)
-            # Lietotājam jāizvēlas metode no divām grupām
         else:
             st.error(translations[language]["error_login"])
 
@@ -313,7 +312,7 @@ def display_pdf(file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
 # =============================================================================
-#  DXF -> GeoDataFrame
+# DXF -> GeoDataFrame
 # =============================================================================
 def read_dxf_to_geodataframe(dxf_file_path):
     try:
@@ -407,7 +406,7 @@ def read_dxf_to_geodataframe(dxf_file_path):
         return gpd.GeoDataFrame()
 
 # =============================================================================
-#  WMS slāņa pievienošana Folium kartei
+# WMS slāņa pievienošana Folium kartei
 # =============================================================================
 def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
     try:
@@ -429,7 +428,7 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         )
 
 # =============================================================================
-#  Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
+# Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
 # =============================================================================
 def process_input(input_data, input_method):
     try:
@@ -669,7 +668,7 @@ def process_input(input_data, input_method):
         st.session_state['data_ready'] = False
 
 # =============================================================================
-#  Attēlot kartē rezultātus (gan ievadīto poligonu, gan atlasītos poligonus)
+# Attēlot kartē rezultātus (gan ievadīto poligonu, gan atlasītos poligonus)
 # =============================================================================
 def display_map_with_results():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -711,7 +710,7 @@ def display_map_with_results():
     st_folium(m, width=700, height=500, key='result_map')
 
 # =============================================================================
-#  Lejupielādes pogas
+# Lejupielādes pogas
 # =============================================================================
 def display_download_buttons():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -967,7 +966,7 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-#  ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu
+# ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu
 # =============================================================================
 def geocode_address(address_text):
     if not address_text:
@@ -999,7 +998,7 @@ def geocode_address(address_text):
         return None, None, None, None
 
 # =============================================================================
-#  Galvenā lietotnes saskarne
+# Galvenā lietotnes saskarne
 # =============================================================================
 def show_main_app():
     direct_pdf_url = "https://drive.google.com/uc?export=download&id=1jUh4Uq9svZsnAWCkN6VQHW1C0kp1wLws"
@@ -1019,25 +1018,30 @@ def show_main_app():
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
 
-    # Rādām divas radio grupas (bez tukšām opcijām)
+    # Izmantojam vienu radio izvēlni ar 4 opcijām.
+    # Pēc vajadzības opcijām tiek pievienots papildus virsraksts tikai pirms trešās opcijas.
     st.markdown("### " + translations[language]["radio_label"])
-    option_A = st.radio("", options=[translations[language]["methods"][0], translations[language]["methods"][1]], key="groupA", index=0)
-    st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
-    option_B = st.radio("", options=[translations[language]["methods"][2], translations[language]["methods"][3]], key="groupB", index=0)
+    options = [
+        ("upload", translations[language]["methods"][0]),
+        ("draw", translations[language]["methods"][1]),
+        ("code", translations[language]["methods"][2]),
+        ("code_adj", translations[language]["methods"][3])
+    ]
 
-    st.info("Lūdzu, izmantojiet tikai vienu no šo divām metožu grupām. Ja abas grupas ir aizpildītas, tiks izmantota augšējā grupas izvēle.")
-    # Ja abas grupas ir aizpildītas, prioritāti piešķiram grupai A
-    # (Lietotājam varat norādīt instrukciju, lai aizpildītu tikai vienu grupu)
-    selected_method = option_A  # pēc noklusējuma izmantojam grupas A
-    # Ja vēlaties, varat pievienot pogu, kas apstiprina izvēli
-    if st.button("Turpināt"):
-        st.session_state['input_option'] = selected_method
+    def format_option(opt):
+        key, label = opt
+        if key == "code":
+            # Pievieno virsrakstu pirms pirmās "meklēšanas" opcijas
+            return "Meklēt pēc kadastra apzīmējuma un iegūt datus:\n" + label
+        else:
+            return label
 
-    if 'input_option' not in st.session_state:
-        return  # neizpildam tālāk, kamēr lietotājs neapstiprina izvēli
+    selected = st.radio("", options=options, format_func=format_option, key="main_option")
+    # Saglabājam tikai izvēlēto metodi (atslēgu)
+    st.session_state['input_option'] = selected[0]
 
-    # Turpmākā loģika izmanto st.session_state['input_option']
-    if st.session_state['input_option'] == translations[language]["methods"][0]:
+    # Turpmākā loģika balstās uz st.session_state['input_option']
+    if st.session_state['input_option'] == "upload":
         map_placeholder = st.empty()
         st.markdown(
             f"""
@@ -1115,7 +1119,7 @@ def show_main_app():
             with st.empty():
                 st_folium(m, width=700, height=500, key='upload_map')
 
-    elif st.session_state['input_option'] == translations[language]["methods"][1]:
+    elif st.session_state['input_option'] == "draw":
         st.info(translations[language]["draw_instruction"])
 
         if 'map_center' not in st.session_state:
@@ -1231,7 +1235,7 @@ def show_main_app():
                 else:
                     st.error(translations[language]["info_draw"])
 
-    elif st.session_state['input_option'] == translations[language]["methods"][2]:
+    elif st.session_state['input_option'] == "code":
         st.info(translations[language]["info_enter_code"])
 
         with st.form(key='code_form'):
@@ -1264,7 +1268,7 @@ def show_main_app():
             display_map_with_results()
             display_download_buttons()
 
-    elif st.session_state['input_option'] == translations[language]["methods"][3]:
+    elif st.session_state['input_option'] == "code_adj":
         st.info(translations[language]["info_code_filter"])
 
         with st.form(key='code_with_adjacent_form'):
@@ -1297,10 +1301,7 @@ def show_main_app():
             display_map_with_results()
             display_download_buttons()
 
-    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in [
-        translations[language]["methods"][2],
-        translations[language]["methods"][3]
-    ]:
+    if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in ["code", "code_adj"]:
         display_map_with_results()
         display_download_buttons()
 
@@ -1314,7 +1315,7 @@ def show_main_app():
     )
 
 # =============================================================================
-#  main() - Galvenā programma
+# main() - Galvenā programma
 # =============================================================================
 def main():
     if 'logged_in' not in st.session_state:
