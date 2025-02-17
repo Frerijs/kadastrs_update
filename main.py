@@ -91,7 +91,7 @@ translations = {
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti kadastra apzīmējumi. Lūdzu, ievadiet vienu vai vairākus kadastra apzīmējumus.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem kadastra numuriem.",
-        "info_code_filter": "Dati tiek iegūti gan par norādītajiem kadastra numuriem, gan pieskarošajiem."
+        "info_code_filter": "Dati tiek iegūti gan par norādītajiem kadastra apzīmējumiem, gan pierobežniekiem."
     },
     "English": {
         "radio_label": "Choose a method to obtain data:",
