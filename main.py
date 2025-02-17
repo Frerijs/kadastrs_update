@@ -899,14 +899,18 @@ def show_main_app():
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
-                # Iesaiņojam ģeometriju kā Feature, lai folium pareizi atpazītu
+                # Iesaiņojam ģeometriju kā FeatureCollection, lai folium pareizi interpretētu
                 geojson_feature = {
                     "type": "Feature",
                     "geometry": st.session_state["found_geometry"],
                     "properties": {}
                 }
+                geojson_feature_collection = {
+                    "type": "FeatureCollection",
+                    "features": [geojson_feature]
+                }
                 folium.GeoJson(
-                    data=geojson_feature,
+                    data=geojson_feature_collection,
                     name="Atrastais poligons (ArcGIS)",
                     style_function=lambda x: {
                         "color": "green",
