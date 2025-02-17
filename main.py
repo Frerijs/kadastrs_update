@@ -81,7 +81,7 @@ translations = {
         "preparing_csv": "4. Sagatavo CSV failu...",
         "preparing_all_csv": "5. Sagatavo VISU CSV failu...",
         "preparing_all_excel": "6. Sagatavo VISU EXCEL failu...",
-        "warning_code_missing": "Kadastra numurs nav pieejams datos. Teksts netiks pievienots DXF failā.",
+        "warning_code_missing": "Kadastra apzīmējums nav pieejams datos. Teksts netiks pievienots DXF failā.",
         "instructions": "Instrukcija",
         "search_address": "Meklēt adresi",
         "search_code": "Meklēšana (pēc kadastra apzīmējuma)",
@@ -555,7 +555,7 @@ def process_input(input_data, input_method):
                     display_codes = "_".join(codes)
                 st.session_state['base_file_name'] = display_codes
                 if missing_codes:
-                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
+                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra apzīmējumiem: {', '.join(missing_codes)}")
                 current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
                 st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
                 st.session_state['joined_gdf'] = joined_gdf
@@ -571,7 +571,7 @@ def process_input(input_data, input_method):
                     display_codes = "_".join(codes)
                 st.session_state['base_file_name'] = display_codes
                 if missing_codes:
-                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
+                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra apzīmējumiem: {', '.join(missing_codes)}")
                 current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
                 st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
                 st.session_state['joined_gdf'] = joined_gdf
