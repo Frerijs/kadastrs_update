@@ -267,7 +267,7 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username_logged = username
             log_user_login(username)
-            # Noklusējuma metode netiek iestatīta – lietotājam tagad jāizvēlas, kuru metodi izmantot
+            # Lietotājam jāizvēlas metode no divām grupām
         else:
             st.error(translations[language]["error_login"])
 
@@ -1019,17 +1019,24 @@ def show_main_app():
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
 
-    # Rādām divas radio pogu grupas bez tukšas opcijas
+    # Rādām divas radio grupas (bez tukšām opcijām)
     st.markdown("### " + translations[language]["radio_label"])
-    groupA = st.radio("", options=[translations[language]["methods"][0], translations[language]["methods"][1]], key="groupA")
+    option_A = st.radio("", options=[translations[language]["methods"][0], translations[language]["methods"][1]], key="groupA", index=0)
     st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
-    groupB = st.radio("", options=[translations[language]["methods"][2], translations[language]["methods"][3]], key="groupB")
+    option_B = st.radio("", options=[translations[language]["methods"][2], translations[language]["methods"][3]], key="groupB", index=0)
 
-    # Lai izvēlētos, kuru metodi izmantot, tiek rādīts vēl viens radio – lietotājam jāizvēlas starp grupu A un grupu B.
-    selected_method = st.radio("Izvēlieties metodi, kuru izmantot:", options=[groupA, groupB])
-    st.session_state['input_option'] = selected_method
+    st.info("Lūdzu, izmantojiet tikai vienu no šo divām metožu grupām. Ja abas grupas ir aizpildītas, tiks izmantota augšējā grupas izvēle.")
+    # Ja abas grupas ir aizpildītas, prioritāti piešķiram grupai A
+    # (Lietotājam varat norādīt instrukciju, lai aizpildītu tikai vienu grupu)
+    selected_method = option_A  # pēc noklusējuma izmantojam grupas A
+    # Ja vēlaties, varat pievienot pogu, kas apstiprina izvēli
+    if st.button("Turpināt"):
+        st.session_state['input_option'] = selected_method
 
-    # Turpmākā loģika balstās uz st.session_state['input_option']
+    if 'input_option' not in st.session_state:
+        return  # neizpildam tālāk, kamēr lietotājs neapstiprina izvēli
+
+    # Turpmākā loģika izmanto st.session_state['input_option']
     if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
         st.markdown(
