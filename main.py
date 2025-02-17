@@ -38,7 +38,8 @@ APP_TYPE = "web"
 
 # Tulkošanas vārdnīca
 translations = {
- "radio_label": "Izvēlieties veidu, kā iegūt datus:",
+    "Latviešu": {
+    "radio_label": "Izvēlieties veidu, kā iegūt datus:",
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
