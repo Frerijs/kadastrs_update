@@ -58,7 +58,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Iziet",  # Poga vairs netiks attēlota
+        "logout": "Iziet",  # Poga ir izņemta no attēlojuma
         "success_logout": "Veiksmīgi izgājāt no konta.",
         "error_authenticate": "Kļūda autentificējot lietotāju: {status_code}",
         "error_login": "Nepareizs lietotājvārds vai parole.",
@@ -106,7 +106,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Logout",
+        "logout": "Logout",  # Not displayed
         "success_logout": "Successfully logged out of the account.",
         "error_authenticate": "Error authenticating user: {status_code}",
         "error_login": "Incorrect username or password.",
@@ -257,7 +257,7 @@ def show_login():
 # Meklēšana (ArcGIS FeatureServer) pēc "code" kolonnas
 # =============================================================================
 def geocode_address(address_text):
-    # Šī funkcija veic vaicājumu ArcGIS FeatureServer, meklējot ierakstu, kura 'code' vērtība sakrīt ar ievadīto tekstu.
+    # Veic vaicājumu ArcGIS FeatureServer, meklējot ierakstu, kura 'code' vērtība sakrīt ar ievadīto tekstu.
     if not address_text:
         return None, None, None, None
     try:
@@ -417,7 +417,9 @@ def display_download_buttons():
                             interior_coords = list(interior.coords)
                             msp.add_lwpolyline(interior_coords, dxfattribs={'layer': 'KKParcel', 'lineweight': 1}, close=True)
                         rep_point = geom.representative_point()
-                        text = msp.add_text(text=code_text, dxfattribs={'insert': (rep_point.x, rep_point.y), 'height': 1, 'style': 'Tahoma', 'layer': 'KKParcel_txt', 'lineweight': 1})
+                        text = msp.add_text(text=code_text, dxfattribs={'insert': (rep_point.x, rep_point.y),
+                                                                         'height': 1, 'style': 'Tahoma',
+                                                                         'layer': 'KKParcel_txt', 'lineweight': 1})
                         text.dxf.halign = TextHAlign.LEFT
                     elif geom.type == 'MultiPolygon':
                         for poly in geom.geoms:
@@ -427,7 +429,9 @@ def display_download_buttons():
                                 interior_coords = list(interior.coords)
                                 msp.add_lwpolyline(interior_coords, dxfattribs={'layer': 'KKParcel', 'lineweight': 1}, close=True)
                             rep_point = poly.representative_point()
-                            text = msp.add_text(text=code_text, dxfattribs={'insert': (rep_point.x, rep_point.y), 'height': 1, 'style': 'Tahoma', 'layer': 'KKParcel_txt', 'lineweight': 1})
+                            text = msp.add_text(text=code_text, dxfattribs={'insert': (rep_point.x, rep_point.y),
+                                                                             'height': 1, 'style': 'Tahoma',
+                                                                             'layer': 'KKParcel_txt', 'lineweight': 1})
                             text.dxf.halign = TextHAlign.LEFT
             doc.saveas(dxf_output_path)
             with open(dxf_output_path, 'rb') as f:
@@ -486,45 +490,6 @@ def display_download_buttons():
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
         progress_text.empty()
         progress_bar.empty()
-
-# =============================================================================
-# Meklēšana (ArcGIS FeatureServer) pēc "code" kolonnas
-# =============================================================================
-def geocode_address(address_text):
-    # Šī funkcija veic vaicājumu ArcGIS FeatureServer, meklējot ierakstu, kura 'code' vērtība sakrīt ar ievadīto tekstu.
-    if not address_text:
-        return None, None, None, None
-    try:
-        arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
-                           "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
-                           "Kadastrs/FeatureServer/8/query")
-        params = {
-            'f': 'json',
-            'where': f"code = '{address_text.strip()}'",
-            'outFields': '*',
-            'returnGeometry': 'true',
-            'outSR': '3059'
-        }
-        query_url = f"{arcgis_url_base}?{urlencode(params)}"
-        resp = requests.get(query_url)
-        if resp.status_code != 200:
-            st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
-            return None, None, None, None
-        esri_data = resp.json()
-        if 'features' not in esri_data or not esri_data['features']:
-            st.error("Nav atrasts ieraksts ar šo kodu.")
-            return None, None, None, None
-        geojson_data = arcgis2geojson(esri_data)
-        if 'features' not in geojson_data or not geojson_data['features']:
-            st.error("Nav atrasts ieraksts ar šo kodu.")
-            return None, None, None, None
-        feature = geojson_data['features'][0]
-        gdf = gpd.GeoDataFrame.from_features([feature], crs="EPSG:3059")
-        centroid = gdf.geometry.centroid.iloc[0]
-        return centroid.y, centroid.x, feature['geometry'], None
-    except Exception as e:
-        st.error(f"Kļūda kodu meklēšanā: {str(e)}")
-        return None, None, None, None
 
 # =============================================================================
 # Galvenā lietotnes saskarne
@@ -624,7 +589,7 @@ def show_main_app():
         if 'found_bbox' not in st.session_state:
             st.session_state['found_bbox'] = None
         with st.form(key='draw_form'):
-            # Tagad meklēšana tiek veikta pēc "code" (ArcGIS FeatureServer)
+            # Meklēšana pēc koda, izmantojot ArcGIS FeatureServer
             address_text = st.text_input(label=translations[language]["search_address"], value="")
             search_col, data_col = st.columns([1, 1])
             with search_col:
@@ -632,7 +597,6 @@ def show_main_app():
             with data_col:
                 submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
             if search_button and address_text.strip():
-                # Veicam meklēšanu pēc "code"
                 y, x, geom, _ = geocode_address(address_text.strip())
                 if y is not None and x is not None:
                     st.session_state['map_center'] = [y, x]
