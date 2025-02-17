@@ -380,7 +380,7 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         st.error(f"Failed to add {name} layer: {e}")
 
 # =============================================================================
-# Meklēšana pēc koda no ArcGIS FeatureServer ar reprojekciju
+# Meklēšana pēc koda no ArcGIS FeatureServer ar reprojekciju uz EPSG:4326
 # =============================================================================
 def search_by_code(code_text):
     if not code_text:
@@ -416,7 +416,7 @@ def search_by_code(code_text):
         shape_reproj = reproject_geometry(shape_obj, src_crs="EPSG:3059", dst_crs="EPSG:4326")
         geojson_reproj = mapping(shape_reproj)
         centroid = shape_reproj.centroid
-        bounds = shape_reproj.bounds  # bounds uz EPSG:4326
+        bounds = shape_reproj.bounds  # (minx, miny, maxx, maxy) uz EPSG:4326
         found_code = feature.get("properties", {}).get("code", None)
         return centroid.y, centroid.x, geojson_reproj, bounds, found_code
     except Exception as e:
@@ -424,7 +424,7 @@ def search_by_code(code_text):
         return None, None, None, None, None
 
 # =============================================================================
-# Apstrāde (izmanto ArcGIS FeatureServer datus)
+# Apstrāde, izmantojot ArcGIS FeatureServer datus
 # =============================================================================
 def process_input(input_data, input_method):
     try:
@@ -606,8 +606,11 @@ def display_map_with_results():
                    style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1, 'weight': 2}).add_to(m)
     folium.LayerControl().add_to(m)
     if not joined_gdf.empty:
-        bounds = joined_gdf.total_bounds
-        m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+        bounds = joined_gdf.total_bounds  # (minx, miny, maxx, maxy)
+        # Pārvēršam bounds uz SW un NE punkti: SW = (miny, minx), NE = (maxy, maxx)
+        sw = [bounds[1], bounds[0]]
+        ne = [bounds[3], bounds[2]]
+        m.fit_bounds([sw, ne])
     st_folium(m, width=700, height=500, key='result_map')
 
 # =============================================================================
@@ -934,12 +937,13 @@ def show_main_app():
                 except Exception as e:
                     st.error(f"Error adding marker: {e}")
             if st.session_state["found_bbox"]:
-                s, n, w, e = st.session_state["found_bbox"]
+                # Pārliecināmies, ka bounds ir pareizā kārtībā: (minx, miny, maxx, maxy)
                 try:
-                    s, n, w, e = map(float, [s, n, w, e])
-                    m.fit_bounds([[s, w], [n, e]])
-                except:
-                    pass
+                    minx, miny, maxx, maxy = map(float, st.session_state["found_bbox"])
+                    # SW punkti = (miny, minx) un NE punkti = (maxy, maxx)
+                    m.fit_bounds([[miny, minx], [maxy, maxx]])
+                except Exception as e:
+                    st.error(f"Error fitting bounds: {e}")
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
             draw = Draw(
