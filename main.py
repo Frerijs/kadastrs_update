@@ -43,8 +43,8 @@ translations = {
         "methods": [
             "Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā",
             "Zīmējiet uz kartes noslēgtu kontūru",
-            "Tikai ievadītajiem kadastra apzīmējumiem",
-            "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
+            "Tikai ievadītajiem kadastra numuriem",
+            "Ievadītajiem kadastra numuriem un pierobežniekiem"
         ],
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
@@ -58,7 +58,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Iziet",  # Saglabāts tulkojums, bet poga netiks attēlota
+        "logout": "Iziet",
         "success_logout": "Veiksmīgi izgājāt no konta.",
         "error_authenticate": "Kļūda autentificējot lietotāju: {status_code}",
         "error_login": "Nepareizs lietotājvārds vai parole.",
@@ -75,17 +75,17 @@ translations = {
         "preparing_csv": "4. Sagatavo CSV failu...",
         "preparing_all_csv": "5. Sagatavo VISU CSV failu...",
         "preparing_all_excel": "6. Sagatavo VISU EXCEL failu...",
-        "warning_code_missing": "Kadastra numurs nav pieejama datos. Teksts netiks pievienots DXF failā.",
+        "warning_code_missing": "Kadastra numurs nav pieejams datos. Teksts netiks pievienots DXF failā.",
         "instructions": "Instrukcija",
         "search_address": "Meklēt adresi",
-        "search_code": "Meklēt pēc koda",  # Jaunais tulkojums
+        "search_code": "Meklēt pēc koda",
         "search_button": "Meklēt",
         "search_error": "Neizdevās atrast datus pēc norādītā koda.",
-        "enter_codes_label": "Ievadiet kadastra numuru (us) (piemērs: 84960050005, 84960050049):",
+        "enter_codes_label": "Ievadiet kadastra numuru (piemērs: 84960050005, 84960050049):",
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti kadastra numuri. Lūdzu, ievadiet vienu vai vairākus kadastra numurus.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem kadastra numuriem.",
-        "info_code_filter": "Dati tiek iegūti gan par norādītajiem kadastra numuriem un pieskarošajiem."
+        "info_code_filter": "Dati tiek iegūti gan par norādītajiem kadastra numuriem, gan pieskarošajiem."
     },
     "English": {
         "radio_label": "Choose a method to obtain data:",
@@ -107,7 +107,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Logout",  # Saglabāts, bet poga netiks attēlota
+        "logout": "Logout",
         "success_logout": "Successfully logged out of the account.",
         "error_authenticate": "Error authenticating user: {status_code}",
         "error_login": "Incorrect username or password.",
@@ -127,7 +127,7 @@ translations = {
         "warning_code_missing": "Cadastral number is not available in the data. The text will not be added to the DXF file.",
         "instructions": "Instructions",
         "search_address": "Search address",
-        "search_code": "Search by code",  # New translation
+        "search_code": "Search by code",
         "search_button": "Search",
         "search_error": "Failed to find data for the provided code.",
         "enter_codes_label": "Enter cadastral number(s):",
@@ -367,7 +367,7 @@ arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
 
 def search_by_code(code_text):
     if not code_text:
-        return None, None, None, None
+        return None, None, None, None, None
     try:
         params = {
             'f': 'json',
@@ -380,37 +380,37 @@ def search_by_code(code_text):
         response = requests.get(query_url)
         if response.status_code != 200:
             st.error(f"ArcGIS query failed with status code {response.status_code}")
-            return None, None, None, None
+            return None, None, None, None, None
         data = response.json()
         if 'features' not in data or not data['features']:
             st.warning(translations[language]["search_error"])
-            return None, None, None, None
+            return None, None, None, None, None
         geojson_data = arcgis2geojson(data)
         if 'features' not in geojson_data or not geojson_data['features']:
             st.warning(translations[language]["search_error"])
-            return None, None, None, None
+            return None, None, None, None, None
         feature = geojson_data['features'][0]
         geometry = feature.get("geometry")
         if not geometry:
-            return None, None, None, None
+            return None, None, None, None, None
         # Konvertējam GeoJSON ģeometriju uz shapely objektu
         import shapely.geometry
         shape_obj = shapely.geometry.shape(geometry)
         centroid = shape_obj.centroid
         bounds = shape_obj.bounds  # (minx, miny, maxx, maxy)
-        # Pārvēršam koordinātas uz EPSG:4326
         from pyproj import Transformer
         transformer = Transformer.from_crs("EPSG:3059", "EPSG:4326", always_xy=True)
         lon, lat = transformer.transform(centroid.x, centroid.y)
         minx, miny, maxx, maxy = bounds
         min_lon, min_lat = transformer.transform(minx, miny)
         max_lon, max_lat = transformer.transform(maxx, maxy)
-        # Sagatavojam bounding box formātā: [south, north, west, east]
         bbox = (min_lat, max_lat, min_lon, max_lon)
-        return lat, lon, geometry, bbox
+        # Iegūstam "code" vērtību no properties
+        found_code = feature.get("properties", {}).get("code", None)
+        return lat, lon, geometry, bbox, found_code
     except Exception as e:
         st.error(f"Error in search_by_code: {str(e)}")
-        return None, None, None, None
+        return None, None, None, None, None
 
 # =============================================================================
 # Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
@@ -421,7 +421,6 @@ def process_input(input_data, input_method):
         progress_text = st.empty()
         st.session_state['input_method'] = input_method
         progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
-        # ArcGIS URL ir izmantots arī iepriekš definētajā search_by_code funkcijā
         params = {'f': 'json', 'outFields': '*', 'returnGeometry': 'true', 'outSR': '3059',
                   'spatialRel': 'esriSpatialRelIntersects'}
         if input_method in ['upload', 'drawn']:
@@ -773,9 +772,8 @@ def display_download_buttons():
 # =============================================================================
 # ADRESES MEKLĒŠANA (tagad pēc "code" no ArcGIS FeatureServer)
 # =============================================================================
-# Izmainīta forma – tagad tiek meklēts pēc koda
+# Funkcija "geocode_address" netiek lietota, jo meklēšana notiek ar search_by_code
 def geocode_address(address_text):
-    # Šo funkciju vairs nevar izmantot – meklēšana notiek ar search_by_code
     return None, None, None, None
 
 # =============================================================================
@@ -799,8 +797,8 @@ def show_main_app():
     if st.button(translations[language]["methods"][1]):
         st.session_state['input_option'] = "draw"
     
-    # Sadaļa 2: "Meklēt pēc kadastra apzīmējuma un iegūt datus:"
-    st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
+    # Sadaļa 2: "Meklēt pēc kadastra numuriem un iegūt datus:"
+    st.markdown("### Meklēt pēc kadastra numuriem un iegūt datus:")
     if st.button(translations[language]["methods"][2]):
         st.session_state['input_option'] = "code"
     if st.button(translations[language]["methods"][3]):
@@ -876,7 +874,7 @@ def show_main_app():
         if 'found_bbox' not in st.session_state:
             st.session_state['found_bbox'] = None
         with st.form(key='draw_form'):
-            # Izmantojam jauno meklēšanas lauku – pēc koda
+            # Meklēšana pēc koda
             code_text = st.text_input(label=translations[language].get("search_code", "Search by code"), value="")
             search_col, data_col = st.columns([1, 1])
             with search_col:
@@ -884,11 +882,12 @@ def show_main_app():
             with data_col:
                 submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
             if search_button and code_text.strip():
-                lat, lon, poly_geojson, bbox = search_by_code(code_text.strip())
+                lat, lon, poly_geojson, bbox, found_code = search_by_code(code_text.strip())
                 if lat is not None and lon is not None:
                     st.session_state['map_center'] = [lat, lon]
                     st.session_state['found_geometry'] = poly_geojson
                     st.session_state['found_bbox'] = bbox
+                    st.session_state['found_code'] = found_code
                 else:
                     st.warning(translations[language]["search_error"])
             current_lat, current_lon = st.session_state['map_center']
@@ -901,9 +900,29 @@ def show_main_app():
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
-                folium.GeoJson(data=st.session_state["found_geometry"],
-                               name="Atrastais poligons (ArcGIS)",
-                               style_function=lambda x: {"color": "green", "fillOpacity": 0.2}).add_to(m)
+                # Izcelam atrasto ģeometriju ar pielāgotu stilu
+                folium.GeoJson(
+                    data=st.session_state["found_geometry"],
+                    name="Atrastais poligons (ArcGIS)",
+                    style_function=lambda x: {
+                        "color": "green",
+                        "fillColor": "yellow",
+                        "fillOpacity": 0.4,
+                        "weight": 2
+                    }
+                ).add_to(m)
+                # Pievienojam marķieri centroidā ar "code" vērtību
+                try:
+                    import shapely.geometry
+                    shape_obj = shapely.geometry.shape(st.session_state["found_geometry"])
+                    centroid = shape_obj.centroid
+                    folium.Marker(
+                        location=[centroid.y, centroid.x],
+                        popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
+                        icon=folium.Icon(color='red', icon='info-sign')
+                    ).add_to(m)
+                except Exception as e:
+                    st.error(f"Kļūda, pievienojot marķieri: {e}")
             if st.session_state["found_bbox"]:
                 s, n, w, e = st.session_state["found_bbox"]
                 try:
@@ -913,9 +932,12 @@ def show_main_app():
                     pass
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
-            draw = Draw(draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False,
-                                        'marker': False, 'circlemarker': False},
-                         edit_options={'edit': False, 'remove': True}, feature_group=drawnItems)
+            draw = Draw(
+                draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False,
+                              'marker': False, 'circlemarker': False},
+                edit_options={'edit': False, 'remove': True},
+                feature_group=drawnItems
+            )
             draw.add_to(m)
             folium.LayerControl().add_to(m)
             m.get_root().add_child(CustomDeleteButton())
@@ -976,8 +998,6 @@ def show_main_app():
         display_map_with_results()
         display_download_buttons()
     
-    # Vērtības saglabāšana bez "Iziet" pogas
-
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
 # =============================================================================
