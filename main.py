@@ -26,12 +26,11 @@ import shapely.geometry
 from shapely.geometry import mapping
 from pyproj import Transformer
 
-# Supabase konfigurācija (demonstrācijas vajadzībām)
-supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
-supabase_key = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVod2JmbHFkcmlwYXRmcGJiZXRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDcxODE2MywiZXhwIjoyMDQ2Mjk0MTYzfQ."
-    "78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"
+# Definē arcgis_url_base pirms jebkuras funkcijas, kas to izmanto
+arcgis_url_base = (
+    "https://utility.arcgis.com/usrsvcs/servers/"
+    "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
+    "Kadastrs/FeatureServer/8/query"
 )
 
 # Konstantas
@@ -381,7 +380,7 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         st.error(f"Failed to add {name} layer: {e}")
 
 # =============================================================================
-# Funkcija: Meklēšana pēc koda no ArcGIS FeatureServer ar reprojekciju
+# Meklēšana pēc koda no ArcGIS FeatureServer ar reprojekciju
 # =============================================================================
 def search_by_code(code_text):
     if not code_text:
@@ -411,22 +410,21 @@ def search_by_code(code_text):
         geometry = feature.get("geometry")
         if not geometry:
             return None, None, None, None, None
-        # Formatējam ģeometriju un reprojekcijājam no EPSG:3059 uz EPSG:4326
+        # Formatējam ģeometriju un pārveidojam uz EPSG:4326
         formatted_geom = format_geojson_geometry(geometry)
         shape_obj = shapely.geometry.shape(formatted_geom)
         shape_reproj = reproject_geometry(shape_obj, src_crs="EPSG:3059", dst_crs="EPSG:4326")
         geojson_reproj = mapping(shape_reproj)
         centroid = shape_reproj.centroid
-        bounds = shape_reproj.bounds  # (minx, miny, maxx, maxy) uz EPSG:4326
+        bounds = shape_reproj.bounds  # bounds uz EPSG:4326
         found_code = feature.get("properties", {}).get("code", None)
-        # Atgriežam (lat, lon) no centroida, geometry un bounds
         return centroid.y, centroid.x, geojson_reproj, bounds, found_code
     except Exception as e:
         st.error(f"Error in search_by_code: {e}")
         return None, None, None, None, None
 
 # =============================================================================
-# Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
+# Apstrāde (izmanto ArcGIS FeatureServer datus)
 # =============================================================================
 def process_input(input_data, input_method):
     try:
@@ -777,7 +775,7 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-# ADRESES MEKLĒŠANA (tagad pēc "code" no ArcGIS FeatureServer)
+# Funkcija, kas netiek lietota, jo adreses meklēšana notiek pēc koda
 # =============================================================================
 def geocode_address(address_text):
     return None, None, None, None
@@ -905,7 +903,6 @@ def show_main_app():
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
-                # Šeit "found_geometry" jau ir reprojekcija uz EPSG:4326
                 feature_collection = {
                     "type": "FeatureCollection",
                     "features": [
