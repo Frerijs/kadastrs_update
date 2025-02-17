@@ -959,7 +959,7 @@ def show_main_app():
                     centroid = shape_obj.centroid
                     folium.Marker(
                         location=[centroid.y, centroid.x],
-                        popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
+                        popup=f"Kad.apz.: {st.session_state.get('found_code', 'N/A')}",
                         icon=folium.Icon(color='red', icon='info-sign')
                     ).add_to(m)
                 except Exception as e:
