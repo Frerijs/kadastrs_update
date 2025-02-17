@@ -52,12 +52,12 @@ translations = {
         "upload_files_label": "Augšupielādējiet nepieciešamos failus:",
         "draw_instruction": "Zīmējiet noslēgtu kontūru uz kartes un nospiediet 'Iegūt datus' pogu.",
         "get_data_button": "Iegūt datus",
-        "download_geojson": "Lejupielādēt datus GeoJSON formātā",
-        "download_shapefile": "Lejupielādēt datus Shapefile formātā (ZIP)",
-        "download_dxf": "Lejupielādēt datus DXF formātā",
-        "download_csv": "Lejupielādēt zemes vienumu sarakstu CSV formātā",
-        "download_all_csv": "Lejupielādēt VISUS datus CSV formātā",
-        "download_all_excel": "Lejupielādēt VISUS datus EXCEL formātā",
+        "download_geojson": "*.GeoJSON",
+        "download_shapefile": "*.SHP",
+        "download_dxf": "*.DXF",
+        "download_csv": "*.CSV",
+        "download_all_csv": "*.XLSX (ekselis)",
+        "download_all_excel": "*.CSV",
         "logout": "Iziet",
         "success_logout": "Veiksmīgi izgājāt no konta.",
         "error_authenticate": "Kļūda autentificējot lietotāju: {status_code}",
@@ -100,12 +100,12 @@ translations = {
         "upload_files_label": "Upload the required files:",
         "draw_instruction": "Draw a closed contour on the map and press the 'Get Data' button.",
         "get_data_button": "Get Data",
-        "download_geojson": "Download data in GeoJSON format",
-        "download_shapefile": "Download data in Shapefile format (ZIP)",
-        "download_dxf": "Download data in DXF format",
-        "download_csv": "Download land unit list in CSV format",
-        "download_all_csv": "Download ALL data in CSV format",
-        "download_all_excel": "Download ALL data in EXCEL format",
+        "download_geojson": "*.GeoJSON",
+        "download_shapefile": "*.SHP",
+        "download_dxf": "*.DXF",
+        "download_csv": "*.CSV",
+        "download_all_csv": "*.XLSX (ekselis)",
+        "download_all_excel": "*.CSV",
         "logout": "Logout",
         "success_logout": "Successfully logged out of the account.",
         "error_authenticate": "Error authenticating user: {status_code}",
@@ -536,19 +536,15 @@ def display_map_with_results():
     if input_method in ['upload', 'drawn']:
         if 'polygon_gdf' in st.session_state:
             polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
-            folium.GeoJson(
-                polygon_gdf,
-                name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-                style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}
-            ).add_to(m)
+            folium.GeoJson(polygon_gdf,
+                           name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
+                           style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}).add_to(m)
         else:
             st.info("Nav saglabāts ievades poligons.")
-    folium.GeoJson(
-        joined_gdf,
-        name=('Atlasītie poligoni' if language == "Latviešu" else 'Selected polygons'),
-        tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
-        style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1, 'weight': 2}
-    ).add_to(m)
+    folium.GeoJson(joined_gdf,
+                   name=('Atlasītie poligoni' if language == "Latviešu" else 'Selected polygons'),
+                   tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
+                   style_function=lambda x: {'color': 'blue', 'fillOpacity': 0.1, 'weight': 2}).add_to(m)
     folium.LayerControl().add_to(m)
     if not joined_gdf.empty:
         bounds = joined_gdf.total_bounds
@@ -583,7 +579,7 @@ def display_download_buttons():
             else:
                 geojson_bytes = geojson_str.encode('utf-8')
                 st.download_button(
-                    label=translations[language]["download_geojson"],
+                    label="*.GeoJSON",
                     data=geojson_bytes,
                     file_name=f'{file_name_prefix}.geojson',
                     mime='application/geo+json'
@@ -613,7 +609,7 @@ def display_download_buttons():
             with open(shp_zip_path, 'rb') as f:
                 shp_zip_bytes = f.read()
             st.download_button(
-                label=translations[language]["download_shapefile"],
+                label="*.SHP",
                 data=shp_zip_bytes,
                 file_name=f'{file_name_prefix}_shp.zip',
                 mime='application/zip'
@@ -668,7 +664,7 @@ def display_download_buttons():
                 dxf_bytes = f.read()
             if dxf_bytes:
                 st.download_button(
-                    label=translations[language]["download_dxf"],
+                    label="*.DXF",
                     data=dxf_bytes,
                     file_name=f'{file_name_prefix}.dxf',
                     mime='application/dxf'
@@ -679,10 +675,8 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-        
-        # Šeit pabeidzam "Kadastra pamatinformācija"
+        # Pabeidzam pamatinformācijas daļu
         st.markdown("### Kadastra pilnā informācija:")
-        
         try:
             progress_text.text(translations[language].get("preparing_all_csv", "5. Sagatavo VISU CSV failu..."))
             all_data_df = joined_gdf.copy()
@@ -693,7 +687,7 @@ def display_download_buttons():
             else:
                 csv_bytes_all = csv_str_all.encode('utf-8')
                 st.download_button(
-                    label=translations[language]["download_all_csv"],
+                    label="*.XLSX (ekselis)",
                     data=csv_bytes_all,
                     file_name=f'{file_name_prefix}_all.csv',
                     mime='text/csv'
@@ -712,7 +706,7 @@ def display_download_buttons():
                 xls_data_df.to_excel(writer, sheet_name='VisiDati', index=False)
             excel_bytes = output_excel.getvalue()
             st.download_button(
-                label=translations[language]["download_all_excel"],
+                label="*.CSV",
                 data=excel_bytes,
                 file_name=f"{file_name_prefix}_all.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -768,18 +762,15 @@ def show_main_app():
         st.session_state['input_option'] = "upload"
     if st.button(translations[language]["methods"][1]):
         st.session_state['input_option'] = "draw"
-
     # Sadaļa 2: "Meklēt pēc kadastra apzīmējuma un iegūt datus:"
     st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
     if st.button(translations[language]["methods"][2]):
         st.session_state['input_option'] = "code"
     if st.button(translations[language]["methods"][3]):
         st.session_state['input_option'] = "code_with_adjacent"
-
     if 'input_option' not in st.session_state:
         st.info("Lūdzu, izvēlieties kādu no opcijām augstāk!")
         return
-
     option = st.session_state['input_option']
     if option == "upload":
         map_placeholder = st.empty()
@@ -865,11 +856,9 @@ def show_main_app():
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
             wms_layers = {'Ortofoto': {'layers': 'public:Orto_LKS'},
                           'Kadastra karte': {'layers': 'publicwfs:Kadastra_karte'}}
-            add_wms_layer(map_obj=m, url=wms_url,
-                          name=('Ortofoto' if language == "Latviešu" else 'Orthophoto'),
+            add_wms_layer(map_obj=m, url=wms_url, name=('Ortofoto' if language == "Latviešu" else 'Orthophoto'),
                           layers=wms_layers['Ortofoto']['layers'], overlay=False, opacity=1.0)
-            add_wms_layer(map_obj=m, url=wms_url,
-                          name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
+            add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
                 folium.GeoJson(data=st.session_state["found_geometry"],
@@ -884,8 +873,8 @@ def show_main_app():
                     pass
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
-            draw = Draw(draw_options={'polyline': False, 'polygon': True, 'circle': False,
-                                        'rectangle': False, 'marker': False, 'circlemarker': False},
+            draw = Draw(draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False,
+                                        'marker': False, 'circlemarker': False},
                          edit_options={'edit': False, 'remove': True}, feature_group=drawnItems)
             draw.add_to(m)
             folium.LayerControl().add_to(m)
@@ -943,15 +932,12 @@ def show_main_app():
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
             display_map_with_results()
             display_download_buttons()
-
     if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in ["code", "code_with_adjacent"]:
         display_map_with_results()
         display_download_buttons()
-
     if st.button(translations[language]["logout"]):
         st.session_state.clear()
         st.success(translations[language]["success_logout"])
-
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
 # =============================================================================
