@@ -1046,8 +1046,8 @@ def show_main_app():
 
     st.session_state['input_option'] = input_option
 
-    # Papildus virsraksts radio pogu izvēlei "Tikai ievadītajiem kadastra apzīmējumiem"
-    # un "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
+    # Ja izvēlēts "Tikai ievadītajiem kadastra apzīmējumiem" vai "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
+    # parādām virsrakstu virs teksta ievades lauka
     if input_option in [translations[language]["methods"][2], translations[language]["methods"][3]]:
         st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
 
@@ -1246,6 +1246,8 @@ def show_main_app():
                     st.error(translations[language]["info_draw"])
 
     elif st.session_state['input_option'] == translations[language]["methods"][2]:
+        # Pievieno virsrakstu virs teksta ievades lauka
+        st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
         st.info(translations[language]["info_enter_code"])
 
         with st.form(key='code_form'):
@@ -1279,6 +1281,8 @@ def show_main_app():
             display_download_buttons()
 
     elif st.session_state['input_option'] == translations[language]["methods"][3]:
+        # Pievieno virsrakstu virs teksta ievades lauka
+        st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
         st.info(translations[language]["info_code_filter"])
 
         with st.form(key='code_with_adjacent_form'):
