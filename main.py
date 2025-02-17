@@ -43,6 +43,7 @@ translations = {
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
+            "──────────",
             'Tikai ievadītajiem kadastra apzīmējumiem',
             'Ievadītajiem kadastra apzīmējumiem un pierobežniekiem'
         ],
