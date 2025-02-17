@@ -26,6 +26,10 @@ import shapely.geometry
 from shapely.geometry import mapping
 from pyproj import Transformer
 
+# Supabase konfigurācija (Aizvietojiet ar savām faktiskajām vērtībām)
+supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
+supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVod2JmbHFkcmlwYXRmcGJiZXRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMDcxODE2MywiZXhwIjoyMDQ2Mjk0MTYzfQ.78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"  # Aizvietojiet ar savu Supabase atslēgu
+
 # Definē arcgis_url_base pirms jebkuras funkcijas, kas to izmanto
 arcgis_url_base = (
     "https://utility.arcgis.com/usrsvcs/servers/"
