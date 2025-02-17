@@ -359,6 +359,22 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         st.error(f"Failed to add {name} layer: {e}")
 
 # =============================================================================
+# Funkcija ģeometrijas formatēšanai uz derīgu GeoJSON objektu
+# =============================================================================
+def format_geojson_geometry(geom):
+    import shapely.geometry
+    try:
+        # Ja geom ir dict un satur atslēgas "type" un "coordinates", atgriežam to tieši
+        if isinstance(geom, dict) and "type" in geom and "coordinates" in geom:
+            return geom
+        # Ja geom nav dict vai satur nederīgas vērtības, mēģinām pārveidot to
+        shape_obj = shapely.geometry.shape(geom)
+        return shapely.geometry.mapping(shape_obj)
+    except Exception as e:
+        st.error(f"Error formatting geometry: {e}")
+        return None
+
+# =============================================================================
 # Jauna funkcija: Meklēšana pēc koda no ArcGIS FeatureServer
 # =============================================================================
 arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
@@ -393,9 +409,10 @@ def search_by_code(code_text):
         geometry = feature.get("geometry")
         if not geometry:
             return None, None, None, None, None
-        # Konvertējam GeoJSON ģeometriju uz shapely objektu
+        # Konvertējam ģeometriju uz derīgu formātu
+        formatted_geom = format_geojson_geometry(geometry)
         import shapely.geometry
-        shape_obj = shapely.geometry.shape(geometry)
+        shape_obj = shapely.geometry.shape(formatted_geom)
         centroid = shape_obj.centroid
         bounds = shape_obj.bounds  # (minx, miny, maxx, maxy)
         from pyproj import Transformer
@@ -405,11 +422,10 @@ def search_by_code(code_text):
         min_lon, min_lat = transformer.transform(minx, miny)
         max_lon, max_lat = transformer.transform(maxx, maxy)
         bbox = (min_lat, max_lat, min_lon, max_lon)
-        # Iegūstam "code" vērtību no properties
         found_code = feature.get("properties", {}).get("code", None)
-        return lat, lon, geometry, bbox, found_code
+        return lat, lon, formatted_geom, bbox, found_code
     except Exception as e:
-        st.error(f"Error in search_by_code: {str(e)}")
+        st.error(f"Error in search_by_code: {e}")
         return None, None, None, None, None
 
 # =============================================================================
@@ -899,38 +915,41 @@ def show_main_app():
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
-                # Iesaiņojam ģeometriju kā FeatureCollection, lai folium pareizi interpretētu
-                geojson_feature = {
-                    "type": "Feature",
-                    "geometry": st.session_state["found_geometry"],
-                    "properties": {}
-                }
-                geojson_feature_collection = {
-                    "type": "FeatureCollection",
-                    "features": [geojson_feature]
-                }
-                folium.GeoJson(
-                    data=geojson_feature_collection,
-                    name="Atrastais poligons (ArcGIS)",
-                    style_function=lambda x: {
-                        "color": "green",
-                        "fillColor": "yellow",
-                        "fillOpacity": 0.4,
-                        "weight": 2
+                # Pārliecināmies, ka ģeometrija ir derīgs GeoJSON objekts
+                formatted_geom = format_geojson_geometry(st.session_state["found_geometry"])
+                if formatted_geom:
+                    feature_collection = {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "geometry": formatted_geom,
+                                "properties": {}
+                            }
+                        ]
                     }
-                ).add_to(m)
-                # Pievienojam marķieri centroidā ar "code" vērtību
-                try:
-                    import shapely.geometry
-                    shape_obj = shapely.geometry.shape(st.session_state["found_geometry"])
-                    centroid = shape_obj.centroid
-                    folium.Marker(
-                        location=[centroid.y, centroid.x],
-                        popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
-                        icon=folium.Icon(color='red', icon='info-sign')
+                    folium.GeoJson(
+                        data=feature_collection,
+                        name="Atrastais poligons (ArcGIS)",
+                        style_function=lambda x: {
+                            "color": "green",
+                            "fillColor": "yellow",
+                            "fillOpacity": 0.4,
+                            "weight": 2
+                        }
                     ).add_to(m)
-                except Exception as e:
-                    st.error(f"Kļūda, pievienojot marķieri: {e}")
+                    # Pievienojam marķieri centroidā ar "code" vērtību
+                    try:
+                        import shapely.geometry
+                        shape_obj = shapely.geometry.shape(formatted_geom)
+                        centroid = shape_obj.centroid
+                        folium.Marker(
+                            location=[centroid.y, centroid.x],
+                            popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
+                            icon=folium.Icon(color='red', icon='info-sign')
+                        ).add_to(m)
+                    except Exception as e:
+                        st.error(f"Kļūda, pievienojot marķieri: {e}")
             if st.session_state["found_bbox"]:
                 s, n, w, e = st.session_state["found_bbox"]
                 try:
