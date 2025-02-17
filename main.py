@@ -84,7 +84,7 @@ translations = {
         "warning_code_missing": "Kadastra numurs nav pieejams datos. Teksts netiks pievienots DXF failā.",
         "instructions": "Instrukcija",
         "search_address": "Meklēt adresi",
-        "search_code": "Meklēt pēc koda",
+        "search_code": "Meklēšana (pēc kadastra apzīmējuma)",
         "search_button": "Meklēt",
         "search_error": "Neizdevās atrast datus pēc norādītā koda.",
         "enter_codes_label": "Ievadiet kadastra apzīmējumus (piemērs: 84960050005, 84960050049):",
