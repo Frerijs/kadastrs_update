@@ -43,6 +43,8 @@ translations = {
         "methods": [
             'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
             'Zīmējiet uz kartes noslēgtu kontūru',
+        "radio_label": "q veidu, kā iegūt datus:",
+        "methods": [
             'Tikai ievadītajiem kadastra apzīmējumiem',
             'Ievadītajiem kadastra apzīmējumiem un pierobežniekiem'
         ],
@@ -1046,11 +1048,6 @@ def show_main_app():
 
     st.session_state['input_option'] = input_option
 
-    # Ja izvēlēts "Tikai ievadītajiem kadastra apzīmējumiem" vai "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
-    # parādām virsrakstu virs teksta ievades lauka
-    if input_option in [translations[language]["methods"][2], translations[language]["methods"][3]]:
-        st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
-
     if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
         st.markdown(
@@ -1246,8 +1243,6 @@ def show_main_app():
                     st.error(translations[language]["info_draw"])
 
     elif st.session_state['input_option'] == translations[language]["methods"][2]:
-        # Pievieno virsrakstu virs teksta ievades lauka
-        st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
         st.info(translations[language]["info_enter_code"])
 
         with st.form(key='code_form'):
@@ -1281,8 +1276,6 @@ def show_main_app():
             display_download_buttons()
 
     elif st.session_state['input_option'] == translations[language]["methods"][3]:
-        # Pievieno virsrakstu virs teksta ievades lauka
-        st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
         st.info(translations[language]["info_code_filter"])
 
         with st.form(key='code_with_adjacent_form'):
