@@ -58,7 +58,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Iziet",  # Saglabāts tulkojums, bet poga netiks attēlota
+        "logout": "Iziet",  # Poga vairs netiks attēlota
         "success_logout": "Veiksmīgi izgājāt no konta.",
         "error_authenticate": "Kļūda autentificējot lietotāju: {status_code}",
         "error_login": "Nepareizs lietotājvārds vai parole.",
@@ -77,10 +77,10 @@ translations = {
         "preparing_all_excel": "6. Sagatavo VISU EXCEL failu...",
         "warning_code_missing": "Kadastra numurs nav pieejama datos. Teksts netiks pievienots DXF failā.",
         "instructions": "Instrukcija",
-        "search_address": "Meklēt adresi",
+        "search_address": "Meklēt pēc koda:",
         "search_button": "Meklēt",
-        "search_error": "Neizdevās atrast adresi.",
-        "enter_codes_label": "Ievadiet kadastra numuru (us) (piemērs: 84960050005, 84960050049):",
+        "search_error": "Neizdevās atrast ierakstu ar šo kodu.",
+        "enter_codes_label": "Ievadiet kadastra numuru (us):",
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti kadastra numuri. Lūdzu, ievadiet vienu vai vairākus kadastra numurus.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem kadastra numuriem.",
@@ -106,7 +106,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Logout",  # Saglabāts, bet poga netiks attēlota
+        "logout": "Logout",
         "success_logout": "Successfully logged out of the account.",
         "error_authenticate": "Error authenticating user: {status_code}",
         "error_login": "Incorrect username or password.",
@@ -125,9 +125,9 @@ translations = {
         "preparing_all_excel": "6. Preparing ALL EXCEL files...",
         "warning_code_missing": "Cadastral number is not available in the data. The text will not be added to the DXF file.",
         "instructions": "Instructions",
-        "search_address": "Search address",
+        "search_address": "Search by code:",
         "search_button": "Search",
-        "search_error": "Failed to find the address.",
+        "search_error": "Failed to find a record with this code.",
         "enter_codes_label": "Enter cadastral number(s):",
         "process_codes_button": "Process codes",
         "error_no_codes_entered": "No cadastral numbers entered. Please enter one or more cadastral numbers.",
@@ -201,11 +201,9 @@ class CustomDeleteButton(MacroElement):
 # =============================================================================
 def authenticate(username, password):
     try:
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"apikey": supabase_key,
+                   "Authorization": f"Bearer {supabase_key}",
+                   "Content-Type": "application/json"}
         url = f"{supabase_url}/rest/v1/users"
         params = {"select": "*", "username": f"eq.{username}", "password": f"eq.{password}"}
         response = requests.get(url, headers=headers, params=params)
@@ -224,7 +222,9 @@ def log_user_login(username):
         riga_tz = ZoneInfo('Europe/Riga')
         current_time = datetime.datetime.now(riga_tz).isoformat()
         data = {"username": username, "App": APP_NAME, "Ver": APP_VERSION, "app_type": APP_TYPE, "login_time": current_time}
-        headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json"}
+        headers = {"apikey": supabase_key,
+                   "Authorization": f"Bearer {supabase_key}",
+                   "Content-Type": "application/json"}
         url = f"{supabase_url}/rest/v1/user_data"
         response = requests.post(url, json=data, headers=headers)
         if response.status_code not in [200, 201]:
@@ -254,273 +254,43 @@ def show_login():
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
 # =============================================================================
-# PDF attēlošanai (ja vajadzīgs)
+# Meklēšana (ArcGIS FeatureServer) pēc "code" kolonnas
 # =============================================================================
-def display_pdf(file_path):
+def geocode_address(address_text):
+    # Šī funkcija veic vaicājumu ArcGIS FeatureServer, meklējot ierakstu, kura 'code' vērtība sakrīt ar ievadīto tekstu.
+    if not address_text:
+        return None, None, None, None
     try:
-        with open(file_path, "rb") as f:
-            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-        pdf_display = f'''
-            <iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf">
-                <p>{translations[language]["error_display_pdf"].format(error="")} 
-                <a href="data:application/pdf;base64,{base64_pdf}">{translations[language]["download_dxf"]}</a>.</p>
-            </iframe>
-        '''
-        st.markdown(pdf_display, unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.error(f"{translations[language]['error_display_pdf'].format(error='PDF file not found.')}: {file_path}")
-    except Exception as e:
-        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-
-# =============================================================================
-# DXF -> GeoDataFrame
-# =============================================================================
-def read_dxf_to_geodataframe(dxf_file_path):
-    try:
-        doc = ezdxf.readfile(dxf_file_path)
-        msp = doc.modelspace()
-        geometries = []
-        def to_2d(coords):
-            if isinstance(coords, tuple):
-                return coords[0], coords[1]
-            return [(x, y) for x, y, *_ in coords]
-        for entity in msp:
-            if entity.dxftype() == 'LINE':
-                start = entity.dxf.start
-                end = entity.dxf.end
-                line = LineString([to_2d((start.x, start.y, start.z)), to_2d((end.x, end.y, end.z))])
-                geometries.append(line)
-            elif entity.dxftype() == 'LWPOLYLINE':
-                points = [to_2d(point) for point in entity.get_points()]
-                if entity.closed:
-                    geometries.append(Polygon(points))
-                else:
-                    geometries.append(LineString(points))
-            elif entity.dxftype() == 'POLYLINE':
-                points = []
-                for vertex in entity.vertices:
-                    location = vertex.dxf.location
-                    points.append(to_2d((location.x, location.y, location.z)))
-                if entity.is_closed:
-                    geometries.append(Polygon(points))
-                else:
-                    geometries.append(LineString(points))
-            elif entity.dxftype() == 'CIRCLE':
-                center = to_2d((entity.dxf.center.x, entity.dxf.center.y, entity.dxf.center.z))
-                radius = entity.dxf.radius
-                circle = Point(center).buffer(radius)
-                geometries.append(circle)
-            elif entity.dxftype() == 'ARC':
-                center = entity.dxf.center
-                radius = entity.dxf.radius
-                start_angle = np.radians(entity.dxf.start_angle)
-                end_angle = np.radians(entity.dxf.end_angle)
-                theta = np.linspace(start_angle, end_angle, 100)
-                arc_points = [(center.x + radius * np.cos(angle), center.y + radius * np.sin(angle)) for angle in theta]
-                geometries.append(LineString(arc_points))
-            elif entity.dxftype() == '3DFACE':
-                vertices = [(entity.dxf.vtx0.x, entity.dxf.vtx0.y, entity.dxf.vtx0.z),
-                            (entity.dxf.vtx1.x, entity.dxf.vtx1.y, entity.dxf.vtx1.z),
-                            (entity.dxf.vtx2.x, entity.dxf.vtx2.y, entity.dxf.vtx2.z)]
-                if entity.dxf.hasattr("vtx3"):
-                    vertices.append((entity.dxf.vtx3.x, entity.dxf.vtx3.y, entity.dxf.vtx3.z))
-                vertices_2d = to_2d(vertices)
-                geometries.append(Polygon(vertices_2d))
-        lines = [geom for geom in geometries if isinstance(geom, LineString)]
-        if lines:
-            multiline = linemerge(lines)
-            polygons = list(polygonize(multiline))
-            geometries.extend(polygons)
-        polygons = [geom for geom in geometries if isinstance(geom, (Polygon, MultiPolygon))]
-        if polygons:
-            unified_geometry = unary_union(polygons)
-        else:
-            unified_geometry = None
-        if unified_geometry:
-            return gpd.GeoDataFrame(geometry=[unified_geometry], crs="EPSG:3059")
-        else:
-            st.error(translations[language]["error_upload_dxf"])
-            return gpd.GeoDataFrame()
-    except Exception as e:
-        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-        return gpd.GeoDataFrame()
-
-# =============================================================================
-# WMS slāņa pievienošana Folium kartei
-# =============================================================================
-def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
-    try:
-        folium.WmsTileLayer(url=url, name=name, layers=layers, format='image/png',
-                            transparent=True, version='1.3.0', overlay=overlay,
-                            control=True, opacity=opacity).add_to(map_obj)
-    except Exception as e:
-        st.error(f"Failed to add {name} layer: {e}")
-
-# =============================================================================
-# Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
-# =============================================================================
-def process_input(input_data, input_method):
-    try:
-        progress_bar = st.progress(0)
-        progress_text = st.empty()
-        st.session_state['input_method'] = input_method
-        progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
         arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
                            "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
                            "Kadastrs/FeatureServer/8/query")
-        progress_bar.progress(10)
-        params = {'f': 'json', 'outFields': '*', 'returnGeometry': 'true', 'outSR': '3059',
-                  'spatialRel': 'esriSpatialRelIntersects'}
-        if input_method in ['upload', 'drawn']:
-            polygon_gdf = input_data.to_crs(epsg=3059)
-            minx, miny, maxx, maxy = polygon_gdf.total_bounds
-            geometry = {"xmin": minx, "ymin": miny, "xmax": maxx, "ymax": maxy, "spatialReference": {"wkid": 3059}}
-            params.update({'where': '1=1', 'geometry': json.dumps(geometry),
-                           'geometryType': 'esriGeometryEnvelope', 'inSR': '3059', 'outSR': '3059'})
-        elif input_method in ['code', 'code_with_adjacent']:
-            codes = input_data
-            sanitized_codes = [code.strip().replace("'", "''") for code in codes]
-            codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
-            params.update({'where': f"code IN ({codes_str})"})
+        params = {
+            'f': 'json',
+            'where': f"code = '{address_text.strip()}'",
+            'outFields': '*',
+            'returnGeometry': 'true',
+            'outSR': '3059'
+        }
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
-        progress_bar.progress(20)
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
-            st.session_state['data_ready'] = False
-            return
-        progress_bar.progress(30)
+            return None, None, None, None
         esri_data = resp.json()
         if 'features' not in esri_data or not esri_data['features']:
-            st.error(translations[language]["error_no_data_found"])
-            st.session_state['data_ready'] = False
-            return
+            st.error("Nav atrasts ieraksts ar šo kodu.")
+            return None, None, None, None
         geojson_data = arcgis2geojson(esri_data)
-        progress_bar.progress(50)
         if 'features' not in geojson_data or not geojson_data['features']:
-            st.error(translations[language]["error_no_data_found"])
-            st.session_state['data_ready'] = False
-            return
-        if input_method in ['upload', 'drawn']:
-            arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-            if arcgis_gdf.crs is None:
-                arcgis_gdf.crs = "EPSG:3059"
-            else:
-                arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
-            progress_bar.progress(60)
-            if input_method == 'upload':
-                input_union = unary_union(polygon_gdf.geometry)
-                arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.touches(input_union))]
-            st.session_state['joined_gdf'] = arcgis_gdf
-            st.session_state['data_ready'] = True
-            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-            st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
-            progress_text.empty()
-            progress_bar.progress(100)
-        elif input_method in ['code', 'code_with_adjacent']:
-            filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-            if filtered_gdf.crs is None:
-                filtered_gdf.crs = "EPSG:3059"
-            else:
-                filtered_gdf = filtered_gdf.to_crs(epsg=3059)
-            progress_bar.progress(60)
-            missing_codes = set(codes) - set(filtered_gdf['code'].unique())
-            if input_method == 'code_with_adjacent':
-                filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-                if filtered_gdf.crs is None:
-                    filtered_gdf.crs = "EPSG:3059"
-                else:
-                    filtered_gdf = filtered_gdf.to_crs(epsg=3059)
-                filtered_geometries = filtered_gdf.geometry.tolist()
-                union_geometry = unary_union(filtered_geometries)
-                adjacent_params = {'f': 'json', 'outFields': '*', 'returnGeometry': 'true', 'outSR': '3059',
-                                   'spatialRel': 'esriSpatialRelIntersects',
-                                   'geometry': json.dumps({"xmin": union_geometry.bounds[0],
-                                                            "ymin": union_geometry.bounds[1],
-                                                            "xmax": union_geometry.bounds[2],
-                                                            "ymax": union_geometry.bounds[3],
-                                                            "spatialReference": {"wkid": 3059}}),
-                                   'geometryType': 'esriGeometryEnvelope', 'inSR': '3059', 'outSR': '3059'}
-                adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
-                resp_adjacent = requests.get(adjacent_query_url)
-                if resp_adjacent.status_code != 200:
-                    st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
-                    st.session_state['data_ready'] = False
-                    return
-                esri_adjacent_data = resp_adjacent.json()
-                if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
-                    st.error(translations[language]["error_no_data_found"])
-                    st.session_state['data_ready'] = False
-                    return
-                geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
-                progress_bar.progress(70)
-                if 'features' not in geojson_adjacent_data or not geojson_adjacent_data['features']:
-                    st.error(translations[language]["error_no_data_found"])
-                    st.session_state['data_ready'] = False
-                    return
-                adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data["features"])
-                if adjacent_gdf.crs is None:
-                    adjacent_gdf.crs = "EPSG:3059"
-                else:
-                    adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
-                filtered_union = unary_union(filtered_gdf.geometry)
-                adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(filtered_union)]
-                if adjacent_gdf.empty:
-                    st.warning(translations[language]["error_no_data_found"])
-                    st.session_state['data_ready'] = False
-                    return
-                progress_bar.progress(80)
-                combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
-                joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
-                progress_bar.progress(90)
-                for col in joined_gdf.columns:
-                    if col != 'geometry':
-                        if not pd.api.types.is_string_dtype(joined_gdf[col]):
-                            joined_gdf[col] = joined_gdf[col].astype(str)
-                invalid_geometries = ~joined_gdf.is_valid
-                if invalid_geometries.any():
-                    joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
-                progress_bar.progress(90)
-                max_codes_in_filename = 5
-                if len(codes) > max_codes_in_filename:
-                    display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
-                else:
-                    display_codes = "_".join(codes)
-                st.session_state['base_file_name'] = display_codes
-                if missing_codes:
-                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
-                current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-                st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
-                st.session_state['joined_gdf'] = joined_gdf
-                st.session_state['data_ready'] = True
-                progress_text.empty()
-                progress_bar.progress(100)
-            elif input_method == 'code':
-                joined_gdf = filtered_gdf.copy()
-                max_codes_in_filename = 5
-                if len(codes) > max_codes_in_filename:
-                    display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
-                else:
-                    display_codes = "_".join(codes)
-                st.session_state['base_file_name'] = display_codes
-                if missing_codes:
-                    st.warning(f"Nav atrasti dati ar norādītajiem kadastra numuriem: {', '.join(missing_codes)}")
-                current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-                st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
-                st.session_state['joined_gdf'] = joined_gdf
-                st.session_state['data_ready'] = True
-                progress_text.empty()
-                progress_bar.progress(100)
-        else:
-            st.session_state['joined_gdf'] = arcgis_gdf
-            st.session_state['data_ready'] = True
-            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-            st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
-            progress_text.empty()
-            progress_bar.progress(100)
+            st.error("Nav atrasts ieraksts ar šo kodu.")
+            return None, None, None, None
+        feature = geojson_data['features'][0]
+        gdf = gpd.GeoDataFrame.from_features([feature], crs="EPSG:3059")
+        centroid = gdf.geometry.centroid.iloc[0]
+        return centroid.y, centroid.x, feature['geometry'], None
     except Exception as e:
-        st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-        st.session_state['data_ready'] = False
+        st.error(f"Kļūda kodu meklēšanā: {str(e)}")
+        return None, None, None, None
 
 # =============================================================================
 # Attēlot kartē rezultātus (gan ievadīto poligonu, gan atlasītos poligonus)
@@ -718,27 +488,42 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-# ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu
+# Meklēšana (ArcGIS FeatureServer) pēc "code" kolonnas
 # =============================================================================
 def geocode_address(address_text):
+    # Šī funkcija veic vaicājumu ArcGIS FeatureServer, meklējot ierakstu, kura 'code' vērtība sakrīt ar ievadīto tekstu.
     if not address_text:
         return None, None, None, None
     try:
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {"format": "json", "q": address_text, "limit": 5, "polygon_geojson": 1}
-        headers = {"User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"}
-        r = requests.get(url, params=params, headers=headers, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        if data:
-            lat = float(data[0]["lat"])
-            lon = float(data[0]["lon"])
-            poly_geojson = data[0].get("geojson")
-            bbox = data[0].get("boundingbox")
-            return lat, lon, poly_geojson, bbox
-        else:
+        arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
+                           "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
+                           "Kadastrs/FeatureServer/8/query")
+        params = {
+            'f': 'json',
+            'where': f"code = '{address_text.strip()}'",
+            'outFields': '*',
+            'returnGeometry': 'true',
+            'outSR': '3059'
+        }
+        query_url = f"{arcgis_url_base}?{urlencode(params)}"
+        resp = requests.get(query_url)
+        if resp.status_code != 200:
+            st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
             return None, None, None, None
-    except:
+        esri_data = resp.json()
+        if 'features' not in esri_data or not esri_data['features']:
+            st.error("Nav atrasts ieraksts ar šo kodu.")
+            return None, None, None, None
+        geojson_data = arcgis2geojson(esri_data)
+        if 'features' not in geojson_data or not geojson_data['features']:
+            st.error("Nav atrasts ieraksts ar šo kodu.")
+            return None, None, None, None
+        feature = geojson_data['features'][0]
+        gdf = gpd.GeoDataFrame.from_features([feature], crs="EPSG:3059")
+        centroid = gdf.geometry.centroid.iloc[0]
+        return centroid.y, centroid.x, feature['geometry'], None
+    except Exception as e:
+        st.error(f"Kļūda kodu meklēšanā: {str(e)}")
         return None, None, None, None
 
 # =============================================================================
@@ -839,6 +624,7 @@ def show_main_app():
         if 'found_bbox' not in st.session_state:
             st.session_state['found_bbox'] = None
         with st.form(key='draw_form'):
+            # Tagad meklēšana tiek veikta pēc "code" (ArcGIS FeatureServer)
             address_text = st.text_input(label=translations[language]["search_address"], value="")
             search_col, data_col = st.columns([1, 1])
             with search_col:
@@ -846,11 +632,12 @@ def show_main_app():
             with data_col:
                 submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
             if search_button and address_text.strip():
-                lat, lon, poly_geojson, bbox = geocode_address(address_text.strip())
-                if lat is not None and lon is not None:
-                    st.session_state['map_center'] = [lat, lon]
-                    st.session_state['found_geometry'] = poly_geojson
-                    st.session_state['found_bbox'] = bbox
+                # Veicam meklēšanu pēc "code"
+                y, x, geom, _ = geocode_address(address_text.strip())
+                if y is not None and x is not None:
+                    st.session_state['map_center'] = [y, x]
+                    st.session_state['found_geometry'] = geom
+                    st.session_state['found_bbox'] = None
                 else:
                     st.warning(translations[language]["search_error"])
             current_lat, current_lon = st.session_state['map_center']
@@ -864,15 +651,8 @@ def show_main_app():
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
                 folium.GeoJson(data=st.session_state["found_geometry"],
-                               name="Atrastais poligons (Nominatim)",
+                               name="Atrastais poligons (ArcGIS)",
                                style_function=lambda x: {"color": "green", "fillOpacity": 0.2}).add_to(m)
-            if st.session_state["found_bbox"]:
-                s, n, w, e = st.session_state["found_bbox"]
-                try:
-                    s, n, w, e = map(float, [s, n, w, e])
-                    m.fit_bounds([[s, w], [n, e]])
-                except:
-                    pass
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
             draw = Draw(draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False,
@@ -938,8 +718,6 @@ def show_main_app():
         display_map_with_results()
         display_download_buttons()
     
-    # Vērtības saglabāšana bez "Iziet" pogas
-
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
 # =============================================================================
