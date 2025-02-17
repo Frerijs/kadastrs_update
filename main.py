@@ -78,8 +78,9 @@ translations = {
         "warning_code_missing": "Kadastra numurs nav pieejama datos. Teksts netiks pievienots DXF failā.",
         "instructions": "Instrukcija",
         "search_address": "Meklēt adresi",
+        "search_code": "Meklēt pēc koda",  # Jaunais tulkojums
         "search_button": "Meklēt",
-        "search_error": "Neizdevās atrast adresi.",
+        "search_error": "Neizdevās atrast datus pēc norādītā koda.",
         "enter_codes_label": "Ievadiet kadastra numuru (us) (piemērs: 84960050005, 84960050049):",
         "process_codes_button": "Apstrādāt kodus",
         "error_no_codes_entered": "Nav ievadīti kadastra numuri. Lūdzu, ievadiet vienu vai vairākus kadastra numurus.",
@@ -126,8 +127,9 @@ translations = {
         "warning_code_missing": "Cadastral number is not available in the data. The text will not be added to the DXF file.",
         "instructions": "Instructions",
         "search_address": "Search address",
+        "search_code": "Search by code",  # New translation
         "search_button": "Search",
-        "search_error": "Failed to find the address.",
+        "search_error": "Failed to find data for the provided code.",
         "enter_codes_label": "Enter cadastral number(s):",
         "process_codes_button": "Process codes",
         "error_no_codes_entered": "No cadastral numbers entered. Please enter one or more cadastral numbers.",
@@ -357,6 +359,60 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         st.error(f"Failed to add {name} layer: {e}")
 
 # =============================================================================
+# Jauna funkcija: Meklēšana pēc koda no ArcGIS FeatureServer
+# =============================================================================
+arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
+                   "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
+                   "Kadastrs/FeatureServer/8/query")
+
+def search_by_code(code_text):
+    if not code_text:
+        return None, None, None, None
+    try:
+        params = {
+            'f': 'json',
+            'outFields': '*',
+            'returnGeometry': 'true',
+            'outSR': '3059',
+            'where': f"code = '{code_text}'"
+        }
+        query_url = f"{arcgis_url_base}?{urlencode(params)}"
+        response = requests.get(query_url)
+        if response.status_code != 200:
+            st.error(f"ArcGIS query failed with status code {response.status_code}")
+            return None, None, None, None
+        data = response.json()
+        if 'features' not in data or not data['features']:
+            st.warning(translations[language]["search_error"])
+            return None, None, None, None
+        geojson_data = arcgis2geojson(data)
+        if 'features' not in geojson_data or not geojson_data['features']:
+            st.warning(translations[language]["search_error"])
+            return None, None, None, None
+        feature = geojson_data['features'][0]
+        geometry = feature.get("geometry")
+        if not geometry:
+            return None, None, None, None
+        # Konvertējam GeoJSON ģeometriju uz shapely objektu
+        import shapely.geometry
+        shape_obj = shapely.geometry.shape(geometry)
+        centroid = shape_obj.centroid
+        bounds = shape_obj.bounds  # (minx, miny, maxx, maxy)
+        # Pārvēršam koordinātas uz EPSG:4326
+        from pyproj import Transformer
+        transformer = Transformer.from_crs("EPSG:3059", "EPSG:4326", always_xy=True)
+        lon, lat = transformer.transform(centroid.x, centroid.y)
+        minx, miny, maxx, maxy = bounds
+        min_lon, min_lat = transformer.transform(minx, miny)
+        max_lon, max_lat = transformer.transform(maxx, maxy)
+        # Sagatavojam bounding box formātā: [south, north, west, east]
+        bbox = (min_lat, max_lat, min_lon, max_lon)
+        return lat, lon, geometry, bbox
+    except Exception as e:
+        st.error(f"Error in search_by_code: {str(e)}")
+        return None, None, None, None
+
+# =============================================================================
 # Apstrādā poligonu vai kodu (ArcGIS FeatureServer)
 # =============================================================================
 def process_input(input_data, input_method):
@@ -365,10 +421,7 @@ def process_input(input_data, input_method):
         progress_text = st.empty()
         st.session_state['input_method'] = input_method
         progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
-        arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
-                           "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
-                           "Kadastrs/FeatureServer/8/query")
-        progress_bar.progress(10)
+        # ArcGIS URL ir izmantots arī iepriekš definētajā search_by_code funkcijā
         params = {'f': 'json', 'outFields': '*', 'returnGeometry': 'true', 'outSR': '3059',
                   'spatialRel': 'esriSpatialRelIntersects'}
         if input_method in ['upload', 'drawn']:
@@ -383,20 +436,20 @@ def process_input(input_data, input_method):
             codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
             params.update({'where': f"code IN ({codes_str})"})
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
-        progress_bar.progress(20)
+        progress_bar.progress(10)
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
             st.session_state['data_ready'] = False
             return
-        progress_bar.progress(30)
+        progress_bar.progress(20)
         esri_data = resp.json()
         if 'features' not in esri_data or not esri_data['features']:
             st.error(translations[language]["error_no_data_found"])
             st.session_state['data_ready'] = False
             return
         geojson_data = arcgis2geojson(esri_data)
-        progress_bar.progress(50)
+        progress_bar.progress(30)
         if 'features' not in geojson_data or not geojson_data['features']:
             st.error(translations[language]["error_no_data_found"])
             st.session_state['data_ready'] = False
@@ -407,7 +460,7 @@ def process_input(input_data, input_method):
                 arcgis_gdf.crs = "EPSG:3059"
             else:
                 arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
-            progress_bar.progress(60)
+            progress_bar.progress(40)
             if input_method == 'upload':
                 input_union = unary_union(polygon_gdf.geometry)
                 arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.touches(input_union))]
@@ -423,7 +476,7 @@ def process_input(input_data, input_method):
                 filtered_gdf.crs = "EPSG:3059"
             else:
                 filtered_gdf = filtered_gdf.to_crs(epsg=3059)
-            progress_bar.progress(60)
+            progress_bar.progress(40)
             missing_codes = set(codes) - set(filtered_gdf['code'].unique())
             if input_method == 'code_with_adjacent':
                 filtered_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
@@ -453,7 +506,7 @@ def process_input(input_data, input_method):
                     st.session_state['data_ready'] = False
                     return
                 geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
-                progress_bar.progress(70)
+                progress_bar.progress(50)
                 if 'features' not in geojson_adjacent_data or not geojson_adjacent_data['features']:
                     st.error(translations[language]["error_no_data_found"])
                     st.session_state['data_ready'] = False
@@ -469,10 +522,10 @@ def process_input(input_data, input_method):
                     st.warning(translations[language]["error_no_data_found"])
                     st.session_state['data_ready'] = False
                     return
-                progress_bar.progress(80)
+                progress_bar.progress(60)
                 combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
                 joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
-                progress_bar.progress(90)
+                progress_bar.progress(70)
                 for col in joined_gdf.columns:
                     if col != 'geometry':
                         if not pd.api.types.is_string_dtype(joined_gdf[col]):
@@ -480,7 +533,7 @@ def process_input(input_data, input_method):
                 invalid_geometries = ~joined_gdf.is_valid
                 if invalid_geometries.any():
                     joined_gdf['geometry'] = joined_gdf['geometry'].buffer(0)
-                progress_bar.progress(90)
+                progress_bar.progress(80)
                 max_codes_in_filename = 5
                 if len(codes) > max_codes_in_filename:
                     display_codes = "_".join(codes[:max_codes_in_filename]) + f"_{len(codes)}_codi"
@@ -718,28 +771,12 @@ def display_download_buttons():
         progress_bar.empty()
 
 # =============================================================================
-# ADRESES MEKLĒŠANA (Nominatim) ar poligona GeoJSON atbalstu
+# ADRESES MEKLĒŠANA (tagad pēc "code" no ArcGIS FeatureServer)
 # =============================================================================
+# Izmainīta forma – tagad tiek meklēts pēc koda
 def geocode_address(address_text):
-    if not address_text:
-        return None, None, None, None
-    try:
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {"format": "json", "q": address_text, "limit": 5, "polygon_geojson": 1}
-        headers = {"User-Agent": "MyStreamlitApp/1.0 (myemail@domain.com)"}
-        r = requests.get(url, params=params, headers=headers, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        if data:
-            lat = float(data[0]["lat"])
-            lon = float(data[0]["lon"])
-            poly_geojson = data[0].get("geojson")
-            bbox = data[0].get("boundingbox")
-            return lat, lon, poly_geojson, bbox
-        else:
-            return None, None, None, None
-    except:
-        return None, None, None, None
+    # Šo funkciju vairs nevar izmantot – meklēšana notiek ar search_by_code
+    return None, None, None, None
 
 # =============================================================================
 # Galvenā lietotnes saskarne
@@ -839,14 +876,15 @@ def show_main_app():
         if 'found_bbox' not in st.session_state:
             st.session_state['found_bbox'] = None
         with st.form(key='draw_form'):
-            address_text = st.text_input(label=translations[language]["search_address"], value="")
+            # Izmantojam jauno meklēšanas lauku – pēc koda
+            code_text = st.text_input(label=translations[language].get("search_code", "Search by code"), value="")
             search_col, data_col = st.columns([1, 1])
             with search_col:
                 search_button = st.form_submit_button(label=translations[language]["search_button"])
             with data_col:
                 submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
-            if search_button and address_text.strip():
-                lat, lon, poly_geojson, bbox = geocode_address(address_text.strip())
+            if search_button and code_text.strip():
+                lat, lon, poly_geojson, bbox = search_by_code(code_text.strip())
                 if lat is not None and lon is not None:
                     st.session_state['map_center'] = [lat, lon]
                     st.session_state['found_geometry'] = poly_geojson
@@ -864,7 +902,7 @@ def show_main_app():
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
                 folium.GeoJson(data=st.session_state["found_geometry"],
-                               name="Atrastais poligons (Nominatim)",
+                               name="Atrastais poligons (ArcGIS)",
                                style_function=lambda x: {"color": "green", "fillOpacity": 0.2}).add_to(m)
             if st.session_state["found_bbox"]:
                 s, n, w, e = st.session_state["found_bbox"]
