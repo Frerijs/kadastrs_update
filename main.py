@@ -11,7 +11,7 @@ import tempfile
 
 # Papildu bibliotēkas
 import ezdxf
-from shapely.ops import linemerge, polygonize, unary_union
+from shapely.ops import linemerge, polygonize, unary_union, transform
 import datetime
 import requests
 from zoneinfo import ZoneInfo
@@ -24,6 +24,7 @@ from arcgis2geojson import arcgis2geojson
 import json
 import shapely.geometry
 from shapely.geometry import mapping
+from pyproj import Transformer
 
 # Supabase konfigurācija (demonstrācijas vajadzībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
@@ -161,6 +162,26 @@ language = st.sidebar.selectbox(
     translations["Latviešu"]["language_label"],
     ["Latviešu", "English"]
 )
+
+# =============================================================================
+# Reprojekcija: pārvērš ģeometriju no EPSG:3059 uz EPSG:4326
+# =============================================================================
+def reproject_geometry(geom, src_crs="EPSG:3059", dst_crs="EPSG:4326"):
+    transformer = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
+    return transform(transformer.transform, geom)
+
+# =============================================================================
+# Funkcija ģeometrijas formatēšanai uz derīgu GeoJSON objektu
+# =============================================================================
+def format_geojson_geometry(geom):
+    try:
+        if isinstance(geom, dict) and "type" in geom and "coordinates" in geom:
+            return geom
+        shape_obj = shapely.geometry.shape(geom)
+        return mapping(shape_obj)
+    except Exception as e:
+        st.error(f"Error formatting geometry: {e}")
+        return None
 
 # =============================================================================
 # Pielāgots Leaflet kontrolis (dzēš poligonus)
@@ -360,27 +381,8 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
         st.error(f"Failed to add {name} layer: {e}")
 
 # =============================================================================
-# Funkcija ģeometrijas formatēšanai uz derīgu GeoJSON objektu
+# Funkcija: Meklēšana pēc koda no ArcGIS FeatureServer ar reprojekciju
 # =============================================================================
-def format_geojson_geometry(geom):
-    try:
-        # Ja geom ir jau dict ar "type" un "coordinates", atgriežam to
-        if isinstance(geom, dict) and "type" in geom and "coordinates" in geom:
-            return geom
-        # Pretējā gadījumā pārvēršam izmantojot shapely
-        shape_obj = shapely.geometry.shape(geom)
-        return mapping(shape_obj)
-    except Exception as e:
-        st.error(f"Error formatting geometry: {e}")
-        return None
-
-# =============================================================================
-# Jauna funkcija: Meklēšana pēc koda no ArcGIS FeatureServer
-# =============================================================================
-arcgis_url_base = ("https://utility.arcgis.com/usrsvcs/servers/"
-                   "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
-                   "Kadastrs/FeatureServer/8/query")
-
 def search_by_code(code_text):
     if not code_text:
         return None, None, None, None, None
@@ -409,20 +411,16 @@ def search_by_code(code_text):
         geometry = feature.get("geometry")
         if not geometry:
             return None, None, None, None, None
-        # Formatējam ģeometriju uz derīgu GeoJSON formātu
+        # Formatējam ģeometriju un reprojekcijājam no EPSG:3059 uz EPSG:4326
         formatted_geom = format_geojson_geometry(geometry)
         shape_obj = shapely.geometry.shape(formatted_geom)
-        centroid = shape_obj.centroid
-        bounds = shape_obj.bounds  # (minx, miny, maxx, maxy)
-        from pyproj import Transformer
-        transformer = Transformer.from_crs("EPSG:3059", "EPSG:4326", always_xy=True)
-        lon, lat = transformer.transform(centroid.x, centroid.y)
-        minx, miny, maxx, maxy = bounds
-        min_lon, min_lat = transformer.transform(minx, miny)
-        max_lon, max_lat = transformer.transform(maxx, maxy)
-        bbox = (min_lat, max_lat, min_lon, max_lon)
+        shape_reproj = reproject_geometry(shape_obj, src_crs="EPSG:3059", dst_crs="EPSG:4326")
+        geojson_reproj = mapping(shape_reproj)
+        centroid = shape_reproj.centroid
+        bounds = shape_reproj.bounds  # (minx, miny, maxx, maxy) uz EPSG:4326
         found_code = feature.get("properties", {}).get("code", None)
-        return lat, lon, formatted_geom, bbox, found_code
+        # Atgriežam (lat, lon) no centroida, geometry un bounds
+        return centroid.y, centroid.x, geojson_reproj, bounds, found_code
     except Exception as e:
         st.error(f"Error in search_by_code: {e}")
         return None, None, None, None, None
@@ -906,40 +904,38 @@ def show_main_app():
                           layers=wms_layers['Ortofoto']['layers'], overlay=False, opacity=1.0)
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
-            # Alternatīva: izmantojam Shapely, lai pārveidotu ģeometriju un izveidotu FeatureCollection
             if st.session_state["found_geometry"]:
-                try:
-                    found_geom = shapely.geometry.shape(st.session_state["found_geometry"])
-                    geojson_dict = mapping(found_geom)
-                    feature_collection = {
-                        "type": "FeatureCollection",
-                        "features": [
-                            {
-                                "type": "Feature",
-                                "geometry": geojson_dict,
-                                "properties": {"code": st.session_state.get("found_code", "N/A")}
-                            }
-                        ]
-                    }
-                    folium.GeoJson(
-                        data=feature_collection,
-                        name="Atrastais poligons (ArcGIS)",
-                        style_function=lambda x: {
-                            "color": "green",
-                            "fillColor": "yellow",
-                            "fillOpacity": 0.4,
-                            "weight": 2
+                # Šeit "found_geometry" jau ir reprojekcija uz EPSG:4326
+                feature_collection = {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "geometry": st.session_state["found_geometry"],
+                            "properties": {"code": st.session_state.get("found_code", "N/A")}
                         }
-                    ).add_to(m)
-                    # Pievienojam marķieri centroidā
-                    centroid = found_geom.centroid
+                    ]
+                }
+                folium.GeoJson(
+                    data=feature_collection,
+                    name="Atrastais poligons (ArcGIS)",
+                    style_function=lambda x: {
+                        "color": "green",
+                        "fillColor": "yellow",
+                        "fillOpacity": 0.4,
+                        "weight": 2
+                    }
+                ).add_to(m)
+                try:
+                    shape_obj = shapely.geometry.shape(st.session_state["found_geometry"])
+                    centroid = shape_obj.centroid
                     folium.Marker(
                         location=[centroid.y, centroid.x],
                         popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
                         icon=folium.Icon(color='red', icon='info-sign')
                     ).add_to(m)
                 except Exception as e:
-                    st.error(f"Error displaying found geometry: {e}")
+                    st.error(f"Error adding marker: {e}")
             if st.session_state["found_bbox"]:
                 s, n, w, e = st.session_state["found_bbox"]
                 try:
