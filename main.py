@@ -626,6 +626,9 @@ def display_download_buttons():
         return
     joined_gdf = st.session_state['joined_gdf']
     with tempfile.TemporaryDirectory() as tmp_output_dir:
+        # Atjaunināts soļu skaits – kopā 7 soļi
+        total_steps = 7
+        current_step = 0
         progress_bar = st.progress(0)
         progress_text = st.empty()
         base_file_name = st.session_state.get('base_file_name', 'ZV_dati_data')
@@ -633,8 +636,7 @@ def display_download_buttons():
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
         
         st.markdown("### Kadastra pamatinformācija (kadastra apzīmējums, robeža):")
-        total_steps = 6
-        current_step = 0
+        # 1. Sagatavo GeoJSON failu
         try:
             progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
             geojson_str = joined_gdf.to_json()
@@ -652,6 +654,7 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        # 2. Sagatavo Shapefile ZIP failu
         try:
             progress_text.text(translations[language].get("preparing_shapefile", "2. Sagatavo Shapefile ZIP failu..."))
             shp_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.shp')
@@ -682,6 +685,7 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        # 3. Sagatavo DXF failu
         try:
             progress_text.text(translations[language].get("preparing_dxf", "3. Sagatavo DXF failu..."))
             dxf_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.dxf')
@@ -739,7 +743,27 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        # 4. Sagatavo CSV failu ar atlasītajiem kodiem (tikai "code" kolonna)
+        try:
+            progress_text.text("4. Sagatavo CSV failu ar atlasītajiem kodiem...")
+            if 'code' in joined_gdf.columns:
+                codes_df = joined_gdf[['code']].drop_duplicates()
+                csv_codes_str = codes_df.to_csv(index=False, encoding='utf-8')
+                st.download_button(
+                    label="*.CSV (Atlasītie kodi)",
+                    data=csv_codes_str.encode('utf-8'),
+                    file_name=f'{file_name_prefix}_codes.csv',
+                    mime='text/csv'
+                )
+            else:
+                st.warning("Nav atrasts 'code' lauks datos.")
+            current_step += 1
+            progress_bar.progress(current_step / total_steps)
+        except Exception as e:
+            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        
         st.markdown("### Kadastra pilnā informācija:")
+        # 5. Sagatavo VISU CSV failu
         try:
             progress_text.text(translations[language].get("preparing_all_csv", "5. Sagatavo VISU CSV failu..."))
             all_data_df = joined_gdf.copy()
@@ -759,6 +783,7 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        # 6. Sagatavo VISU EXCEL failu
         try:
             progress_text.text(translations[language].get("preparing_all_excel", "6. Sagatavo VISU EXCEL failu..."))
             import io
