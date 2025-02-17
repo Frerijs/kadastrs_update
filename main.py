@@ -772,7 +772,6 @@ def display_download_buttons():
 # =============================================================================
 # ADRESES MEKLĒŠANA (tagad pēc "code" no ArcGIS FeatureServer)
 # =============================================================================
-# Funkcija "geocode_address" netiek lietota, jo meklēšana notiek ar search_by_code
 def geocode_address(address_text):
     return None, None, None, None
 
@@ -900,9 +899,14 @@ def show_main_app():
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
-                # Izcelam atrasto ģeometriju ar pielāgotu stilu
+                # Iesaiņojam ģeometriju kā Feature, lai folium pareizi atpazītu
+                geojson_feature = {
+                    "type": "Feature",
+                    "geometry": st.session_state["found_geometry"],
+                    "properties": {}
+                }
                 folium.GeoJson(
-                    data=st.session_state["found_geometry"],
+                    data=geojson_feature,
                     name="Atrastais poligons (ArcGIS)",
                     style_function=lambda x: {
                         "color": "green",
