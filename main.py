@@ -808,8 +808,7 @@ def show_main_app():
     if st.button(translations[language]["methods"][1]):
         st.session_state['input_option'] = "draw"
     
-    # Sadaļa 2: Meklēšana pēc koda
-    st.markdown("### Meklēt pēc kadastra numuriem un iegūt datus:")
+    # Noņemt virsrakstu "Meklēt pēc kadastra numuriem un iegūt datus:" starp pogām
     if st.button(translations[language]["methods"][2]):
         st.session_state['input_option'] = "code"
     if st.button(translations[language]["methods"][3]):
@@ -941,10 +940,8 @@ def show_main_app():
                 except Exception as e:
                     st.error(f"Error adding marker: {e}")
             if st.session_state["found_bbox"]:
-                # Pārliecināmies, ka bounds ir pareizā kārtībā: (minx, miny, maxx, maxy)
                 try:
                     minx, miny, maxx, maxy = map(float, st.session_state["found_bbox"])
-                    # SW punkti = (miny, minx) un NE punkti = (maxy, maxx)
                     m.fit_bounds([[miny, minx], [maxy, maxx]])
                 except Exception as e:
                     st.error(f"Error fitting bounds: {e}")
