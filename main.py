@@ -1046,6 +1046,11 @@ def show_main_app():
 
     st.session_state['input_option'] = input_option
 
+    # Papildus virsraksts radio pogu izvēlei "Tikai ievadītajiem kadastra apzīmējumiem"
+    # un "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
+    if input_option in [translations[language]["methods"][2], translations[language]["methods"][3]]:
+        st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
+
     if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
         st.markdown(
