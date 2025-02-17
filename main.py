@@ -39,15 +39,23 @@ APP_TYPE = "web"
 # Tulkošanas vārdnīca
 translations = {
     "Latviešu": {
-        "radio_label": "Izvēlieties veidu, kā iegūt datus:",
-        "methods": [
-            'Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā',
-            'Zīmējiet uz kartes noslēgtu kontūru',
-        "radio_label": "q veidu, kā iegūt datus:",
-        "methods": [
-            'Tikai ievadītajiem kadastra apzīmējumiem',
-            'Ievadītajiem kadastra apzīmējumiem un pierobežniekiem'
-        ],
+        # Pirmais radio izvēles bloks
+method = st.radio(
+    "Izvēlieties veidu, kā iegūt datus:",
+    [
+        "Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā",
+        "Zīmējiet uz kartes noslēgtu kontūru"
+    ]
+)
+
+# Otrais radio izvēles bloks ar jaunu labeli
+cadaster_method = st.radio(
+    "Meklēt pēc kadastra apzīmējuma un iegūt datus:",
+    [
+        "Tikai ievadītajiem kadastra apzīmējumiem",
+        "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
+    ]
+)
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
         "upload_instruction": "Augšupielādējiet slēgtu kontūru vai vairākas kontūras vienā no atbalstītajiem failu formātiem:",
