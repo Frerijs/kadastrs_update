@@ -267,8 +267,7 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username_logged = username
             log_user_login(username)
-            # Nenoklusējuma izvēle – nevienu, jo jāizvēlas
-            st.session_state['input_option'] = None
+            # Noklusējuma metode netiek iestatīta – lietotājam tagad jāizvēlas, kuru metodi izmantot
         else:
             st.error(translations[language]["error_login"])
 
@@ -1020,34 +1019,15 @@ def show_main_app():
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
 
-    # Rādām divas atsevišķas radio pogu grupas
+    # Rādām divas radio pogu grupas bez tukšas opcijas
     st.markdown("### " + translations[language]["radio_label"])
-    option_A = st.radio(
-        label="",
-        options=["", translations[language]["methods"][0], translations[language]["methods"][1]],
-        key="groupA",
-        index=0
-    )
+    groupA = st.radio("", options=[translations[language]["methods"][0], translations[language]["methods"][1]], key="groupA")
     st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
-    option_B = st.radio(
-        label="",
-        options=["", translations[language]["methods"][2], translations[language]["methods"][3]],
-        key="groupB",
-        index=0
-    )
+    groupB = st.radio("", options=[translations[language]["methods"][2], translations[language]["methods"][3]], key="groupB")
 
-    # Noteiksim kopējo izvēli – ja kādā no grupām nav tukša opcija, tad tā ir izvēlēta
-    if option_A != "":
-        st.session_state['input_option'] = option_A
-    elif option_B != "":
-        st.session_state['input_option'] = option_B
-    else:
-        st.session_state['input_option'] = None
-
-    # Ja neviens variants nav izvēlēts, informējam lietotāju
-    if st.session_state['input_option'] is None:
-        st.info("Lūdzu, izvēlieties vienu no norādītajām opcijām augstāk.")
-        return
+    # Lai izvēlētos, kuru metodi izmantot, tiek rādīts vēl viens radio – lietotājam jāizvēlas starp grupu A un grupu B.
+    selected_method = st.radio("Izvēlieties metodi, kuru izmantot:", options=[groupA, groupB])
+    st.session_state['input_option'] = selected_method
 
     # Turpmākā loģika balstās uz st.session_state['input_option']
     if st.session_state['input_option'] == translations[language]["methods"][0]:
