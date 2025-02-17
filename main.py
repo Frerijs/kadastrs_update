@@ -56,7 +56,7 @@ cadaster_method = st.radio(
         "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
     ]
 )
-        ],
+        
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
         "upload_instruction": "Augšupielādējiet slēgtu kontūru vai vairākas kontūras vienā no atbalstītajiem failu formātiem:",
