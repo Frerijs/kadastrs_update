@@ -970,7 +970,7 @@ def show_main_app():
                     m.fit_bounds([[miny, minx], [maxy, maxx]])
                 except Exception as e:
                     st.error(f"Error fitting bounds: {e}")
-            drawnItems = folium.FeatureGroup(name="")
+            #drawnItems = folium.FeatureGroup(name="")
             drawnItems.add_to(m)
             draw = Draw(
                 draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False,
