@@ -22,6 +22,8 @@ from jinja2 import Template
 import base64
 from arcgis2geojson import arcgis2geojson
 import json
+import shapely.geometry
+from shapely.geometry import mapping
 
 # Supabase konfigurācija (demonstrācijas vajadzībām)
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
@@ -143,7 +145,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# Palielinām pogu fonta izmēru
 st.markdown(
     """
     <style>
@@ -362,14 +363,13 @@ def add_wms_layer(map_obj, url, name, layers, overlay=True, opacity=1.0):
 # Funkcija ģeometrijas formatēšanai uz derīgu GeoJSON objektu
 # =============================================================================
 def format_geojson_geometry(geom):
-    import shapely.geometry
     try:
-        # Ja geom ir dict un satur atslēgas "type" un "coordinates", atgriežam to tieši
+        # Ja geom ir jau dict ar "type" un "coordinates", atgriežam to
         if isinstance(geom, dict) and "type" in geom and "coordinates" in geom:
             return geom
-        # Ja geom nav dict vai satur nederīgas vērtības, mēģinām pārveidot to
+        # Pretējā gadījumā pārvēršam izmantojot shapely
         shape_obj = shapely.geometry.shape(geom)
-        return shapely.geometry.mapping(shape_obj)
+        return mapping(shape_obj)
     except Exception as e:
         st.error(f"Error formatting geometry: {e}")
         return None
@@ -409,9 +409,8 @@ def search_by_code(code_text):
         geometry = feature.get("geometry")
         if not geometry:
             return None, None, None, None, None
-        # Konvertējam ģeometriju uz derīgu formātu
+        # Formatējam ģeometriju uz derīgu GeoJSON formātu
         formatted_geom = format_geojson_geometry(geometry)
-        import shapely.geometry
         shape_obj = shapely.geometry.shape(formatted_geom)
         centroid = shape_obj.centroid
         bounds = shape_obj.bounds  # (minx, miny, maxx, maxy)
@@ -591,24 +590,20 @@ def process_input(input_data, input_method):
         st.session_state['data_ready'] = False
 
 # =============================================================================
-# Attēlot kartē rezultātus (gan ievadīto poligonu, gan atlasītos poligonus)
+# Attēlot kartē rezultātus
 # =============================================================================
 def display_map_with_results():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
         st.warning(translations[language]["error_no_data_found"])
         return
     joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
-    input_method = st.session_state.get('input_method', 'drawn')
     m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
     tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu" else "Cadastral identifier:")
-    if input_method in ['upload', 'drawn']:
-        if 'polygon_gdf' in st.session_state:
-            polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
-            folium.GeoJson(polygon_gdf,
-                           name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-                           style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}).add_to(m)
-        else:
-            st.info("Nav saglabāts ievades poligons.")
+    if 'polygon_gdf' in st.session_state:
+        polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
+        folium.GeoJson(polygon_gdf,
+                       name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
+                       style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}).add_to(m)
     folium.GeoJson(joined_gdf,
                    name=('Atlasītie poligoni' if language == "Latviešu" else 'Selected polygons'),
                    tooltip=folium.GeoJsonTooltip(fields=['code'], aliases=[tooltip_field]),
@@ -620,7 +615,7 @@ def display_map_with_results():
     st_folium(m, width=700, height=500, key='result_map')
 
 # =============================================================================
-# Lejupielādes pogas ar virsrakstiem
+# Lejupielādes pogas
 # =============================================================================
 def display_download_buttons():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -634,9 +629,7 @@ def display_download_buttons():
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
         
-        # Kadastra pamatinformācija
         st.markdown("### Kadastra pamatinformācija (kadastra apzīmējums, robeža):")
-        
         total_steps = 6
         current_step = 0
         try:
@@ -805,14 +798,14 @@ def show_main_app():
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
     
-    # Sadaļa 1: "Izvēlieties veidu, kā iegūt datus:"
+    # Sadaļa 1: Izvēle
     st.markdown("### " + translations[language]["radio_label"])
     if st.button(translations[language]["methods"][0]):
         st.session_state['input_option'] = "upload"
     if st.button(translations[language]["methods"][1]):
         st.session_state['input_option'] = "draw"
     
-    # Sadaļa 2: "Meklēt pēc kadastra numuriem un iegūt datus:"
+    # Sadaļa 2: Meklēšana pēc koda
     st.markdown("### Meklēt pēc kadastra numuriem un iegūt datus:")
     if st.button(translations[language]["methods"][2]):
         st.session_state['input_option'] = "code"
@@ -830,8 +823,8 @@ def show_main_app():
         * **DXF** (.dxf)  
         * **SHP** (.shp, .shx, .dbf, .prj)""")
         uploaded_files = st.file_uploader(translations[language]["upload_files_label"],
-                                            type=["shp", "shx", "dbf", "prj", "dxf"],
-                                            accept_multiple_files=True)
+                                          type=["shp", "shx", "dbf", "prj", "dxf"],
+                                          accept_multiple_files=True)
         if uploaded_files:
             with tempfile.TemporaryDirectory() as tmpdirname:
                 for uploaded_file in uploaded_files:
@@ -889,7 +882,6 @@ def show_main_app():
         if 'found_bbox' not in st.session_state:
             st.session_state['found_bbox'] = None
         with st.form(key='draw_form'):
-            # Meklēšana pēc koda
             code_text = st.text_input(label=translations[language].get("search_code", "Search by code"), value="")
             search_col, data_col = st.columns([1, 1])
             with search_col:
@@ -914,17 +906,18 @@ def show_main_app():
                           layers=wms_layers['Ortofoto']['layers'], overlay=False, opacity=1.0)
             add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
+            # Alternatīva: izmantojam Shapely, lai pārveidotu ģeometriju un izveidotu FeatureCollection
             if st.session_state["found_geometry"]:
-                # Pārliecināmies, ka ģeometrija ir derīgs GeoJSON objekts
-                formatted_geom = format_geojson_geometry(st.session_state["found_geometry"])
-                if formatted_geom:
+                try:
+                    found_geom = shapely.geometry.shape(st.session_state["found_geometry"])
+                    geojson_dict = mapping(found_geom)
                     feature_collection = {
                         "type": "FeatureCollection",
                         "features": [
                             {
                                 "type": "Feature",
-                                "geometry": formatted_geom,
-                                "properties": {}
+                                "geometry": geojson_dict,
+                                "properties": {"code": st.session_state.get("found_code", "N/A")}
                             }
                         ]
                     }
@@ -938,18 +931,15 @@ def show_main_app():
                             "weight": 2
                         }
                     ).add_to(m)
-                    # Pievienojam marķieri centroidā ar "code" vērtību
-                    try:
-                        import shapely.geometry
-                        shape_obj = shapely.geometry.shape(formatted_geom)
-                        centroid = shape_obj.centroid
-                        folium.Marker(
-                            location=[centroid.y, centroid.x],
-                            popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
-                            icon=folium.Icon(color='red', icon='info-sign')
-                        ).add_to(m)
-                    except Exception as e:
-                        st.error(f"Kļūda, pievienojot marķieri: {e}")
+                    # Pievienojam marķieri centroidā
+                    centroid = found_geom.centroid
+                    folium.Marker(
+                        location=[centroid.y, centroid.x],
+                        popup=f"Code: {st.session_state.get('found_code', 'N/A')}",
+                        icon=folium.Icon(color='red', icon='info-sign')
+                    ).add_to(m)
+                except Exception as e:
+                    st.error(f"Error displaying found geometry: {e}")
             if st.session_state["found_bbox"]:
                 s, n, w, e = st.session_state["found_bbox"]
                 try:
