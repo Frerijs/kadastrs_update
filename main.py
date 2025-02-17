@@ -39,24 +39,13 @@ APP_TYPE = "web"
 # Tulkošanas vārdnīca
 translations = {
     "Latviešu": {
-    "radio_label": "Izvēlieties veidu, kā iegūt datus:",
+        "radio_label": "Izvēlieties veidu, kā iegūt datus:",
         "methods": [
-            "Izvēlieties veidu, kā iegūt datus:",
-    [
-        "Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā",
-        "Zīmējiet uz kartes noslēgtu kontūru"
-    ]
-)
-
-# Otrais radio izvēles bloks ar jaunu labeli
-cadaster_method = st.radio(
-    "Meklēt pēc kadastra apzīmējuma un iegūt datus:",
-    [
-        "Tikai ievadītajiem kadastra apzīmējumiem",
-        "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
-    ]
-)
-        
+            "Augšupielādējiet iepriekš sagatavotu noslēgtas kontūras failu .DXF vai .SHP formātā",
+            "Zīmējiet uz kartes noslēgtu kontūru",
+            "Tikai ievadītajiem kadastra apzīmējumiem",
+            "Ievadītajiem kadastra apzīmējumiem un pierobežniekiem"
+        ],
         "title": "Kadastra apzīmējumu saraksta lejuplāde (ZV robežas un apzīmējumi)",
         "language_label": "Valoda / Language",
         "upload_instruction": "Augšupielādējiet slēgtu kontūru vai vairākas kontūras vienā no atbalstītajiem failu formātiem:",
@@ -278,7 +267,8 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username_logged = username
             log_user_login(username)
-            st.session_state['input_option'] = translations[language]["methods"][1]
+            # Nenoklusējuma izvēle – nevienu, jo jāizvēlas
+            st.session_state['input_option'] = None
         else:
             st.error(translations[language]["error_login"])
 
@@ -1030,33 +1020,36 @@ def show_main_app():
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
 
-    radio_label = translations[language]["radio_label"]
-    methods = translations[language]["methods"]
-
-    if 'input_option' not in st.session_state:
-        st.session_state['input_option'] = methods[1]
-    if 'previous_option' not in st.session_state:
-        st.session_state['previous_option'] = methods[1]
-
-    input_option = st.radio(
-        label=radio_label,
-        options=methods,
-        index=methods.index(st.session_state['input_option']) if st.session_state['input_option'] in methods else 1
+    # Rādām divas atsevišķas radio pogu grupas
+    st.markdown("### " + translations[language]["radio_label"])
+    option_A = st.radio(
+        label="",
+        options=["", translations[language]["methods"][0], translations[language]["methods"][1]],
+        key="groupA",
+        index=0
+    )
+    st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
+    option_B = st.radio(
+        label="",
+        options=["", translations[language]["methods"][2], translations[language]["methods"][3]],
+        key="groupB",
+        index=0
     )
 
-    if st.session_state['previous_option'] != input_option:
-        keys_to_reset = [
-            'joined_gdf', 'polygon_gdf', 'data_ready',
-            'base_file_name', 'processing_date', 'input_method',
-            'missing_codes'
-        ]
-        for key in keys_to_reset:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.session_state['previous_option'] = input_option
+    # Noteiksim kopējo izvēli – ja kādā no grupām nav tukša opcija, tad tā ir izvēlēta
+    if option_A != "":
+        st.session_state['input_option'] = option_A
+    elif option_B != "":
+        st.session_state['input_option'] = option_B
+    else:
+        st.session_state['input_option'] = None
 
-    st.session_state['input_option'] = input_option
+    # Ja neviens variants nav izvēlēts, informējam lietotāju
+    if st.session_state['input_option'] is None:
+        st.info("Lūdzu, izvēlieties vienu no norādītajām opcijām augstāk.")
+        return
 
+    # Turpmākā loģika balstās uz st.session_state['input_option']
     if st.session_state['input_option'] == translations[language]["methods"][0]:
         map_placeholder = st.empty()
         st.markdown(
