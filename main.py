@@ -58,7 +58,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Iziet",
+        "logout": "Iziet",  # Saglabāts tulkojums, bet poga netiks attēlota
         "success_logout": "Veiksmīgi izgājāt no konta.",
         "error_authenticate": "Kļūda autentificējot lietotāju: {status_code}",
         "error_login": "Nepareizs lietotājvārds vai parole.",
@@ -106,7 +106,7 @@ translations = {
         "download_csv": "*.CSV",
         "download_all_csv": "*.XLSX (ekselis)",
         "download_all_excel": "*.CSV",
-        "logout": "Logout",
+        "logout": "Logout",  # Saglabāts, bet poga netiks attēlota
         "success_logout": "Successfully logged out of the account.",
         "error_authenticate": "Error authenticating user: {status_code}",
         "error_login": "Incorrect username or password.",
@@ -566,7 +566,7 @@ def display_download_buttons():
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
         
-        # Pamatinformācija
+        # Kadastra pamatinformācija
         st.markdown("### Kadastra pamatinformācija (kadastra apzīmējums, robeža):")
         
         total_steps = 6
@@ -675,7 +675,6 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-        # Pabeidzam pamatinformācijas daļu
         st.markdown("### Kadastra pilnā informācija:")
         try:
             progress_text.text(translations[language].get("preparing_all_csv", "5. Sagatavo VISU CSV failu..."))
@@ -755,22 +754,25 @@ def show_main_app():
                       <strong>{translations[language]["instructions"]}</strong></a>''', unsafe_allow_html=True)
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
-
+    
     # Sadaļa 1: "Izvēlieties veidu, kā iegūt datus:"
     st.markdown("### " + translations[language]["radio_label"])
     if st.button(translations[language]["methods"][0]):
         st.session_state['input_option'] = "upload"
     if st.button(translations[language]["methods"][1]):
         st.session_state['input_option'] = "draw"
+    
     # Sadaļa 2: "Meklēt pēc kadastra apzīmējuma un iegūt datus:"
     st.markdown("### Meklēt pēc kadastra apzīmējuma un iegūt datus:")
     if st.button(translations[language]["methods"][2]):
         st.session_state['input_option'] = "code"
     if st.button(translations[language]["methods"][3]):
         st.session_state['input_option'] = "code_with_adjacent"
+    
     if 'input_option' not in st.session_state:
         st.info("Lūdzu, izvēlieties kādu no opcijām augstāk!")
         return
+    
     option = st.session_state['input_option']
     if option == "upload":
         map_placeholder = st.empty()
@@ -935,9 +937,9 @@ def show_main_app():
     if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in ["code", "code_with_adjacent"]:
         display_map_with_results()
         display_download_buttons()
-    if st.button(translations[language]["logout"]):
-        st.session_state.clear()
-        st.success(translations[language]["success_logout"])
+    
+    # Vērtības saglabāšana bez "Iziet" pogas
+
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
 # =============================================================================
