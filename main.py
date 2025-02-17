@@ -166,9 +166,7 @@ class CustomDeleteButton(MacroElement):
     _template = Template("""
         {% macro script(this, kwargs) %}
             L.Control.DeleteButton = L.Control.extend({
-                options: {
-                    position: 'topleft'
-                },
+                options: { position: 'topleft' },
                 onAdd: function(map) {
                     var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
                     var button = L.DomUtil.create('a', 'leaflet-control-delete', container);
@@ -180,7 +178,6 @@ class CustomDeleteButton(MacroElement):
                     button.style.width = '30px';
                     button.style.height = '30px';
                     button.style.cursor = 'pointer';
-                    
                     L.DomEvent.disableClickPropagation(container);
                     L.DomEvent.on(button, 'click', function(e) {
                         e.preventDefault();
@@ -190,7 +187,6 @@ class CustomDeleteButton(MacroElement):
                             }
                         });
                     });
-                    
                     return container;
                 }
             });
@@ -211,18 +207,11 @@ def authenticate(username, password):
             "Content-Type": "application/json",
         }
         url = f"{supabase_url}/rest/v1/users"
-        params = {
-            "select": "*",
-            "username": f"eq.{username}",
-            "password": f"eq.{password}",
-        }
+        params = {"select": "*", "username": f"eq.{username}", "password": f"eq.{password}"}
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             data = response.json()
-            if data:
-                return True
-            else:
-                return False
+            return bool(data)
         else:
             st.error(translations[language]["error_authenticate"].format(status_code=response.status_code))
             return False
@@ -234,26 +223,12 @@ def log_user_login(username):
     try:
         riga_tz = ZoneInfo('Europe/Riga')
         current_time = datetime.datetime.now(riga_tz).isoformat()
-        data = {
-            "username": username,
-            "App": APP_NAME,
-            "Ver": APP_VERSION,
-            "app_type": APP_TYPE,
-            "login_time": current_time
-        }
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json"
-        }
+        data = {"username": username, "App": APP_NAME, "Ver": APP_VERSION, "app_type": APP_TYPE, "login_time": current_time}
+        headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json"}
         url = f"{supabase_url}/rest/v1/user_data"
         response = requests.post(url, json=data, headers=headers)
         if response.status_code not in [200, 201]:
-            st.error(
-                translations[language]["error_authenticate"].format(
-                    status_code=response.status_code
-                ) + f", {response.text}"
-            )
+            st.error(translations[language]["error_authenticate"].format(status_code=response.status_code) + f", {response.text}")
     except Exception as e:
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
@@ -273,19 +248,10 @@ def login():
 def show_login():
     st.title(translations[language]["title"])
     with st.form(key='login_form'):
-        username = st.text_input(
-            "Lietotājvārds" if language == "Latviešu" else "Username",
-            key='username'
-        )
-        password = st.text_input(
-            "Parole" if language == "Latviešu" else "Password",
-            type="password", key='password'
-        )
+        username = st.text_input("Lietotājvārds" if language == "Latviešu" else "Username", key='username')
+        password = st.text_input("Parole" if language == "Latviešu" else "Password", type="password", key='password')
         st.form_submit_button(label=("Pieslēgties" if language == "Latviešu" else "Login"), on_click=login)
-    st.markdown(
-        "<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>",
-        unsafe_allow_html=True
-    )
+    st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
 # =============================================================================
 # PDF attēlošanai (ja vajadzīgs)
@@ -313,19 +279,16 @@ def read_dxf_to_geodataframe(dxf_file_path):
     try:
         doc = ezdxf.readfile(dxf_file_path)
         msp = doc.modelspace()
-
         geometries = []
         def to_2d(coords):
             if isinstance(coords, tuple):
                 return coords[0], coords[1]
             return [(x, y) for x, y, *_ in coords]
-
         for entity in msp:
             if entity.dxftype() == 'LINE':
                 start = entity.dxf.start
                 end = entity.dxf.end
-                line = LineString([to_2d((start.x, start.y, start.z)),
-                                   to_2d((end.x, end.y, end.z))])
+                line = LineString([to_2d((start.x, start.y, start.z)), to_2d((end.x, end.y, end.z))])
                 geometries.append(line)
             elif entity.dxftype() == 'LWPOLYLINE':
                 points = [to_2d(point) for point in entity.get_points()]
@@ -353,8 +316,7 @@ def read_dxf_to_geodataframe(dxf_file_path):
                 start_angle = np.radians(entity.dxf.start_angle)
                 end_angle = np.radians(entity.dxf.end_angle)
                 theta = np.linspace(start_angle, end_angle, 100)
-                arc_points = [(center.x + radius * np.cos(angle),
-                               center.y + radius * np.sin(angle)) for angle in theta]
+                arc_points = [(center.x + radius * np.cos(angle), center.y + radius * np.sin(angle)) for angle in theta]
                 geometries.append(LineString(arc_points))
             elif entity.dxftype() == '3DFACE':
                 vertices = [(entity.dxf.vtx0.x, entity.dxf.vtx0.y, entity.dxf.vtx0.z),
@@ -364,7 +326,6 @@ def read_dxf_to_geodataframe(dxf_file_path):
                     vertices.append((entity.dxf.vtx3.x, entity.dxf.vtx3.y, entity.dxf.vtx3.z))
                 vertices_2d = to_2d(vertices)
                 geometries.append(Polygon(vertices_2d))
-
         lines = [geom for geom in geometries if isinstance(geom, LineString)]
         if lines:
             multiline = linemerge(lines)
@@ -595,7 +556,7 @@ def display_map_with_results():
     st_folium(m, width=700, height=500, key='result_map')
 
 # =============================================================================
-# Lejupielādes pogas
+# Lejupielādes pogas ar virsrakstiem
 # =============================================================================
 def display_download_buttons():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -608,6 +569,10 @@ def display_download_buttons():
         base_file_name = st.session_state.get('base_file_name', 'ZV_dati_data')
         processing_date = st.session_state.get('processing_date', datetime.datetime.now().strftime('%Y%m%d'))
         file_name_prefix = f"{base_file_name}_ZV_dati_{processing_date}"
+        
+        # Pamatinformācija
+        st.markdown("### Kadastra pamatinformācija (kadastra apzīmējums, robeža):")
+        
         total_steps = 6
         current_step = 0
         try:
@@ -714,28 +679,10 @@ def display_download_buttons():
             progress_bar.progress(current_step / total_steps)
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
-        try:
-            progress_text.text(translations[language].get("preparing_csv", "4. Sagatavo CSV failu..."))
-            if 'code' in joined_gdf.columns:
-                code_series = joined_gdf['code'].drop_duplicates()
-                code_df = code_series.to_frame()
-                csv_str = code_df.to_csv(index=False, encoding='utf-8')
-                if not csv_str:
-                    st.error(translations[language]["error_display_pdf"].format(error="Failed to generate CSV data."))
-                else:
-                    csv_bytes = csv_str.encode('utf-8')
-                    st.download_button(
-                        label=translations[language]["download_csv"],
-                        data=csv_bytes,
-                        file_name=f'{file_name_prefix}.csv',
-                        mime='text/csv'
-                    )
-            else:
-                st.warning(translations[language]["warning_code_missing"])
-            current_step += 1
-            progress_bar.progress(current_step / total_steps)
-        except Exception as e:
-            st.error(translations[language]["error_display_pdf"].format(error=str(e)))
+        
+        # Šeit pabeidzam "Kadastra pamatinformācija"
+        st.markdown("### Kadastra pilnā informācija:")
+        
         try:
             progress_text.text(translations[language].get("preparing_all_csv", "5. Sagatavo VISU CSV failu..."))
             all_data_df = joined_gdf.copy()
@@ -833,10 +780,8 @@ def show_main_app():
         st.info("Lūdzu, izvēlieties kādu no opcijām augstāk!")
         return
 
-    # Turpmākā loģika balstās uz izvēlēto metodi
     option = st.session_state['input_option']
     if option == "upload":
-        # Augšupielādes gadījums
         map_placeholder = st.empty()
         st.markdown(f"""{translations[language]["upload_instruction"]}  
         * **DXF** (.dxf)  
@@ -892,7 +837,6 @@ def show_main_app():
             st.info(translations[language]["info_upload"])
             m = folium.Map(location=default_location, zoom_start=7)
             st_folium(m, width=700, height=500, key='upload_map')
-
     elif option == "draw":
         st.info(translations[language]["draw_instruction"])
         if 'map_center' not in st.session_state:
@@ -919,16 +863,17 @@ def show_main_app():
             current_lat, current_lon = st.session_state['map_center']
             m = folium.Map(location=[current_lat, current_lon], zoom_start=10)
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
-            wms_layers = {
-                'Ortofoto': {'layers': 'public:Orto_LKS'},
-                'Kadastra karte': {'layers': 'publicwfs:Kadastra_karte'}
-            }
-            add_wms_layer(map_obj=m, url=wms_url, name=('Ortofoto' if language == "Latviešu" else 'Orthophoto'),
+            wms_layers = {'Ortofoto': {'layers': 'public:Orto_LKS'},
+                          'Kadastra karte': {'layers': 'publicwfs:Kadastra_karte'}}
+            add_wms_layer(map_obj=m, url=wms_url,
+                          name=('Ortofoto' if language == "Latviešu" else 'Orthophoto'),
                           layers=wms_layers['Ortofoto']['layers'], overlay=False, opacity=1.0)
-            add_wms_layer(map_obj=m, url=wms_url, name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
+            add_wms_layer(map_obj=m, url=wms_url,
+                          name=('Kadastra karte' if language == "Latviešu" else 'Cadastral map'),
                           layers=wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
             if st.session_state["found_geometry"]:
-                folium.GeoJson(data=st.session_state["found_geometry"], name="Atrastais poligons (Nominatim)",
+                folium.GeoJson(data=st.session_state["found_geometry"],
+                               name="Atrastais poligons (Nominatim)",
                                style_function=lambda x: {"color": "green", "fillOpacity": 0.2}).add_to(m)
             if st.session_state["found_bbox"]:
                 s, n, w, e = st.session_state["found_bbox"]
@@ -939,8 +884,8 @@ def show_main_app():
                     pass
             drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
-            draw = Draw(draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False,
-                                        'marker': False, 'circlemarker': False},
+            draw = Draw(draw_options={'polyline': False, 'polygon': True, 'circle': False,
+                                        'rectangle': False, 'marker': False, 'circlemarker': False},
                          edit_options={'edit': False, 'remove': True}, feature_group=drawnItems)
             draw.add_to(m)
             folium.LayerControl().add_to(m)
@@ -958,7 +903,6 @@ def show_main_app():
                         st.session_state['base_file_name'] = 'polygon'
                 else:
                     st.error(translations[language]["info_draw"])
-
     elif option == "code":
         st.info(translations[language]["info_enter_code"])
         with st.form(key='code_form'):
@@ -979,7 +923,6 @@ def show_main_app():
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code':
             display_map_with_results()
             display_download_buttons()
-
     elif option == "code_with_adjacent":
         st.info(translations[language]["info_code_filter"])
         with st.form(key='code_with_adjacent_form'):
