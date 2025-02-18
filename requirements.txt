@@ -10,3 +10,4 @@ pandas
 requests
 arcgis2geojson
 xlsxwriter
+openpyxl
