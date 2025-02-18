@@ -502,11 +502,11 @@ def parse_uploaded_codes(txt_content: str) -> list:
 # -------------------------------------------------------------------------
 # -------- JAUNĀ Palīgfunkcija - chunk pieeja garam code sarakstam --------
 # -------------------------------------------------------------------------
-def fetch_code_features(codes_list, chunk_size=200):
+def fetch_code_features(codes_list, chunk_size=50):
     """
     Meklē kadastra apzīmējumus 'codes_list' ArcGIS servisā,
-    sadalot tos pa gabaliņiem, ja saraksts ir pārāk garš,
-    un apvieno vienā GeoDataFrame.
+    sadalot tos pa gabaliņiem (chunk) ar izmēru 'chunk_size=50',
+    lai nepārsniegtu ArcGIS atļauto limitu.
     """
     import math
     from arcgis2geojson import arcgis2geojson
@@ -520,7 +520,7 @@ def fetch_code_features(codes_list, chunk_size=200):
         end_idx = start_idx + chunk_size
         codes_chunk = codes_list[start_idx:end_idx]
 
-        # Sagatavojam "where" nosacījumu: code IN ('aaa','bbb',...)
+        # Sagatavojam "where" nosacījumu: code IN ('k1','k2',...)
         sanitized_codes = [code.strip().replace("'", "''") for code in codes_chunk]
         codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
 
@@ -532,6 +532,9 @@ def fetch_code_features(codes_list, chunk_size=200):
             'where': f"code IN ({codes_str})"
         }
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
+
+        # (Pēc vajadzības var izdrukāt testēšanai) st.write(f"Chunk {i+1}/{chunks_count} URL:", query_url)
+
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code} (chunk {i+1}/{chunks_count})")
@@ -539,7 +542,7 @@ def fetch_code_features(codes_list, chunk_size=200):
 
         esri_data = resp.json()
         if not esri_data.get('features'):
-            # Ja šajā gabaliņā nav rezultātu, pārejam pie nākamā
+            # Tukšs rezultāts šajā gabaliņā
             continue
 
         geojson_data = arcgis2geojson(esri_data)
@@ -652,8 +655,8 @@ def process_input(input_data, input_method):
         elif input_method in ['code', 'code_with_adjacent']:
             codes = input_data  # ievadītie + no .txt faila
 
-            # Izmantojam JAUNO palīgfunkciju ar chunk
-            filtered_gdf = fetch_code_features(codes, chunk_size=200)
+            # Izmantojam JAUNO palīgfunkciju ar chunk_size=50
+            filtered_gdf = fetch_code_features(codes, chunk_size=50)
             progress_bar.progress(30)
 
             if filtered_gdf.empty:
