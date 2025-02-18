@@ -6,12 +6,13 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
-from shapely.geometry import Polygon, LineString, Point, MultiPolygon
 import tempfile
 
 # Papildu bibliotēkas
 import ezdxf
 from shapely.ops import linemerge, polygonize, unary_union, transform
+import shapely.geometry
+from shapely.geometry import Polygon, LineString, Point, MultiPolygon
 import datetime
 import requests
 from zoneinfo import ZoneInfo
@@ -22,12 +23,12 @@ from jinja2 import Template
 import base64
 from arcgis2geojson import arcgis2geojson
 import json
-import shapely.geometry
-from shapely.geometry import mapping
 from pyproj import Transformer
 import math
 
-# -------------- Supabase konfigurācija (DEMO) --------------
+# -------------------------------------------------------------------------
+# ----------------------- Supabase konfigurācija (DEMO) -------------------
+# -------------------------------------------------------------------------
 supabase_url = "https://uhwbflqdripatfpbbetf.supabase.co"
 supabase_key = (
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
@@ -35,19 +36,25 @@ supabase_key = (
     "78wsNZ4KBg2l6zeZ1ZknBBooe0PeLtJzRU-7eXo3WTk"
 )
 
-# -------------- ArcGIS FeatureServer URL --------------
+# -------------------------------------------------------------------------
+# ----------------------- ArcGIS FeatureServer URL -------------------------
+# -------------------------------------------------------------------------
 arcgis_url_base = (
     "https://utility.arcgis.com/usrsvcs/servers/"
     "4923f6b355934843b33aa92718520f12/rest/services/Hosted/"
     "Kadastrs/FeatureServer/8/query"
 )
 
-# -------------- Konstantes --------------
+# -------------------------------------------------------------------------
+# --------------------------- Konstantes / Info ----------------------------
+# -------------------------------------------------------------------------
 APP_NAME = "Kadastrs"
 APP_VERSION = "4.0"
 APP_TYPE = "web"
 
-# -------------- Tulkojumi --------------
+# -------------------------------------------------------------------------
+# ----------------------- Tulkošanas vārdnīca -----------------------------
+# -------------------------------------------------------------------------
 translations = {
     "Latviešu": {
         "radio_label": "Izvēlieties veidu, kā iegūt datus:",
@@ -151,7 +158,9 @@ translations = {
     }
 }
 
-# -------------- Streamlit lapas iestatījumi --------------
+# -------------------------------------------------------------------------
+# --------------------- Streamlit lapas iestatījumi ------------------------
+# -------------------------------------------------------------------------
 st.set_page_config(
     page_title=translations["Latviešu"]["title"],
     layout="centered"
@@ -175,7 +184,7 @@ language = st.sidebar.selectbox(
 )
 
 # -------------------------------------------------------------------------
-# --------------------- Palīgfunkcijas (CRS, PDF, uc.) --------------------
+# ------------------------- Palīgfunkcijas ---------------------------------
 # -------------------------------------------------------------------------
 def reproject_geometry(geom, src_crs="EPSG:3059", dst_crs="EPSG:4326"):
     transformer = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
@@ -186,7 +195,7 @@ def format_geojson_geometry(geom):
         if isinstance(geom, dict) and "type" in geom and "coordinates" in geom:
             return geom
         shape_obj = shapely.geometry.shape(geom)
-        return mapping(shape_obj)
+        return shapely.geometry.mapping(shape_obj)
     except Exception as e:
         st.error(f"Error formatting geometry: {e}")
         return None
@@ -242,7 +251,7 @@ def display_pdf(file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
 # -------------------------------------------------------------------------
-# --------------------- Lietotāja autentifikācija (DEMO) ------------------
+# ----------------------- Autentifikācija (DEMO) ---------------------------
 # -------------------------------------------------------------------------
 def authenticate(username, password):
     try:
@@ -367,6 +376,7 @@ def read_dxf_to_geodataframe(dxf_file_path):
                 vertices_2d = to_2d(vertices)
                 geometries.append(Polygon(vertices_2d))
 
+        # Apvienojam Lines -> poligoni
         lines = [geom for geom in geometries if isinstance(geom, LineString)]
         if lines:
             multiline = linemerge(lines)
@@ -446,7 +456,7 @@ def search_by_code(code_text):
         formatted_geom = format_geojson_geometry(geometry)
         shape_obj = shapely.geometry.shape(formatted_geom)
         shape_reproj = reproject_geometry(shape_obj, src_crs="EPSG:3059", dst_crs="EPSG:4326")
-        geojson_reproj = mapping(shape_reproj)
+        geojson_reproj = shapely.geometry.mapping(shape_reproj)
         centroid = shape_reproj.centroid
         bounds = shape_reproj.bounds
         found_code = feature.get("properties", {}).get("code", None)
@@ -458,15 +468,17 @@ def search_by_code(code_text):
         return None, None, None, None, None
 
 # -------------------------------------------------------------------------
-# ----------- Palīgfunkcijas failu parsēšanai (TXT, CSV, XLSX) -----------
+# ----------------- Palīgfunkcijas *.txt / *.csv / *.xlsx -----------------
 # -------------------------------------------------------------------------
 def parse_uploaded_codes_txt(txt_content: str) -> list:
+    # Aizvietojam . , ; : un atstarpes ar komatu
     for delim in [".", ",", ";", ":", " "]:
         txt_content = txt_content.replace(delim, ",")
     codes = [c.strip() for c in txt_content.split(",") if c.strip()]
     return codes
 
 def parse_uploaded_codes_csv(df: pd.DataFrame) -> list:
+    # Pieņemam, ka pirmajā kolonnā ir kodi
     if df.empty:
         return []
     first_col = df.columns[0]
@@ -475,6 +487,7 @@ def parse_uploaded_codes_csv(df: pd.DataFrame) -> list:
     return codes
 
 def parse_uploaded_codes_xlsx(df: pd.DataFrame) -> list:
+    # Pieņemam, ka pirmajā kolonnā ir kodi
     if df.empty:
         return []
     first_col = df.columns[0]
@@ -484,20 +497,36 @@ def parse_uploaded_codes_xlsx(df: pd.DataFrame) -> list:
 
 def parse_uploaded_codes_file(uploaded_file) -> list:
     filename = uploaded_file.name.lower()
+    # Sadalām atkarībā no paplašinājuma
     if filename.endswith(".txt"):
-        content = uploaded_file.read().decode("utf-8", errors="replace")
-        return parse_uploaded_codes_txt(content)
+        try:
+            content = uploaded_file.read().decode("utf-8", errors="replace")
+            return parse_uploaded_codes_txt(content)
+        except Exception as e:
+            st.error(f"Neizdevās nolasīt TXT failu: {e}")
+            return []
     elif filename.endswith(".csv"):
-        df = pd.read_csv(uploaded_file, sep=None, engine='python')
-        return parse_uploaded_codes_csv(df)
+        try:
+            # Ja CSV var saturēt dažādus atdalītājus, izmantojam autodetekciju:
+            df = pd.read_csv(uploaded_file, sep=None, engine='python', on_bad_lines='skip')
+            # Ja zinām, ka vienmēr ir ; vai ,, var norādīt sep=';'
+            return parse_uploaded_codes_csv(df)
+        except Exception as e:
+            st.error(f"Neizdevās nolasīt CSV failu: {e}")
+            return []
     elif filename.endswith(".xlsx") or filename.endswith(".xls"):
-        df = pd.read_excel(uploaded_file, engine='openpyxl')
-        return parse_uploaded_codes_xlsx(df)
+        try:
+            import openpyxl  # Nodrošina, ka 'openpyxl' ir instalēts
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+            return parse_uploaded_codes_xlsx(df)
+        except Exception as e:
+            st.error(f"Neizdevās nolasīt XLSX failu: {e}")
+            return []
     else:
         return []
 
 # -------------------------------------------------------------------------
-# ------------------ fetch_code_features (chunk pieeja) -------------------
+# ------------------ fetch_code_features (ar chunk_size=50) ---------------
 # -------------------------------------------------------------------------
 def fetch_code_features(codes_list, chunk_size=50):
     all_features_gdf = gpd.GeoDataFrame()
@@ -508,6 +537,7 @@ def fetch_code_features(codes_list, chunk_size=50):
         start_idx = i * chunk_size
         end_idx = start_idx + chunk_size
         codes_chunk = codes_list[start_idx:end_idx]
+
         sanitized_codes = [code.strip().replace("'", "''") for code in codes_chunk]
         codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
 
@@ -534,9 +564,16 @@ def fetch_code_features(codes_list, chunk_size=50):
             continue
 
         chunk_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
+
+        # Pārbaudām, vai tiešām ir "geometry" kolonna
+        if chunk_gdf.empty or "geometry" not in chunk_gdf.columns:
+            continue
+
+        # Ja nav definēts crs, iestata EPSG:3059
         if chunk_gdf.crs is None:
             chunk_gdf.crs = "EPSG:3059"
         else:
+            # Klasiska reprojekcija
             chunk_gdf = chunk_gdf.to_crs(epsg=3059)
 
         if all_features_gdf.empty:
@@ -553,7 +590,7 @@ def fetch_code_features(codes_list, chunk_size=50):
     return all_features_gdf
 
 # -------------------------------------------------------------------------
-# --------------------- process_input (galvenā) ---------------------------
+# -------------------- process_input (galvenā) ----------------------------
 # -------------------------------------------------------------------------
 def process_input(input_data, input_method):
     try:
@@ -563,7 +600,7 @@ def process_input(input_data, input_method):
         st.session_state['input_method'] = input_method
         progress_text.text(translations[language].get("preparing_geojson", "1. Sagatavo GeoJSON failu..."))
 
-        # 1) Poligonu (upload / drawn)
+        # 1) Ja "upload" vai "drawn"
         if input_method in ['upload', 'drawn']:
             polygon_gdf = input_data.to_crs(epsg=3059)
             minx, miny, maxx, maxy = polygon_gdf.total_bounds
@@ -610,31 +647,34 @@ def process_input(input_data, input_method):
                 return
 
             arcgis_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"])
-            if arcgis_gdf.crs is None:
-                arcgis_gdf.crs = "EPSG:3059"
+            if not arcgis_gdf.empty and "geometry" in arcgis_gdf.columns:
+                if arcgis_gdf.crs is None:
+                    arcgis_gdf.crs = "EPSG:3059"
+                else:
+                    arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
+                progress_bar.progress(40)
+
+                if input_method == 'upload':
+                    input_union = unary_union(polygon_gdf.geometry)
+                    arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.touches(input_union))]
+
+                st.session_state['joined_gdf'] = arcgis_gdf
+                st.session_state['data_ready'] = True
+                current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
+                st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
+                progress_text.empty()
+                progress_bar.progress(100)
             else:
-                arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
-            progress_bar.progress(40)
+                st.error(translations[language]["error_no_data_found"])
+                st.session_state['data_ready'] = False
 
-            if input_method == 'upload':
-                input_union = unary_union(polygon_gdf.geometry)
-                arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.touches(input_union))]
-
-            st.session_state['joined_gdf'] = arcgis_gdf
-            st.session_state['data_ready'] = True
-            current_time = datetime.datetime.now(ZoneInfo('Europe/Riga'))
-            st.session_state['processing_date'] = current_time.strftime('%Y%m%d')
-
-            progress_text.empty()
-            progress_bar.progress(100)
-
-        # 2) Kodus (code / code_with_adjacent)
+        # 2) Ja "code" vai "code_with_adjacent"
         elif input_method in ['code', 'code_with_adjacent']:
             codes = input_data
             filtered_gdf = fetch_code_features(codes, chunk_size=50)
             progress_bar.progress(30)
 
-            if filtered_gdf.empty:
+            if filtered_gdf.empty or "geometry" not in filtered_gdf.columns:
                 st.error(translations[language]["error_no_data_found"])
                 st.session_state['data_ready'] = False
                 return
@@ -661,6 +701,7 @@ def process_input(input_data, input_method):
                     'inSR': '3059',
                     'outSR': '3059'
                 }
+
                 adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
                 resp_adjacent = requests.get(adjacent_query_url)
                 if resp_adjacent.status_code != 200:
@@ -674,8 +715,13 @@ def process_input(input_data, input_method):
                     st.session_state['data_ready'] = False
                     return
 
-                geojson_adjacent_data = arcgis2geojson(esri_adj_data["features"])
-                adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data)
+                geojson_adj_data = arcgis2geojson(esri_adj_data["features"])
+                adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adj_data)
+                if adjacent_gdf.empty or "geometry" not in adjacent_gdf.columns:
+                    st.warning(translations[language]["error_no_data_found"])
+                    st.session_state['data_ready'] = False
+                    return
+
                 if adjacent_gdf.crs is None:
                     adjacent_gdf.crs = "EPSG:3059"
                 else:
@@ -693,6 +739,7 @@ def process_input(input_data, input_method):
                 joined_gdf = filtered_gdf.copy()
 
             progress_bar.progress(60)
+            # Salabojam ģeometriju
             if not joined_gdf.empty:
                 invalid_geometries = ~joined_gdf.is_valid
                 if invalid_geometries.any():
@@ -724,24 +771,30 @@ def process_input(input_data, input_method):
         st.session_state['data_ready'] = False
 
 # -------------------------------------------------------------------------
-# --------------------- Rezultātu kartes attēlošana -----------------------
+# --------------------- Kartes attēlošana ar rezultātiem ------------------
 # -------------------------------------------------------------------------
 def display_map_with_results():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
         st.warning(translations[language]["error_no_data_found"])
         return
 
-    joined_gdf = st.session_state.joined_gdf.to_crs(epsg=4326)
+    joined_gdf = st.session_state['joined_gdf']
+    if "geometry" not in joined_gdf.columns or joined_gdf.empty:
+        st.warning(translations[language]["error_no_data_found"])
+        return
+
+    joined_gdf = joined_gdf.to_crs(epsg=4326)
     m = folium.Map(location=[56.946285, 24.105078], zoom_start=7)
 
     tooltip_field = ('Kadastra apzīmējums:' if language == "Latviešu" else "Cadastral identifier:")
-    if 'polygon_gdf' in st.session_state:
-        polygon_gdf = st.session_state.polygon_gdf.to_crs(epsg=4326)
-        folium.GeoJson(
-            polygon_gdf,
-            name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
-            style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}
-        ).add_to(m)
+    if 'polygon_gdf' in st.session_state and not st.session_state['polygon_gdf'].empty:
+        polygon_gdf = st.session_state['polygon_gdf'].to_crs(epsg=4326)
+        if not polygon_gdf.empty and "geometry" in polygon_gdf.columns:
+            folium.GeoJson(
+                polygon_gdf,
+                name=('Ievadītais poligons' if language=="Latviešu" else 'Input polygon'),
+                style_function=lambda x: {'fillColor': 'none', 'color': 'red', 'weight': 3}
+            ).add_to(m)
 
     folium.GeoJson(
         joined_gdf,
@@ -752,8 +805,8 @@ def display_map_with_results():
 
     folium.LayerControl().add_to(m)
 
-    if not joined_gdf.empty:
-        bounds = joined_gdf.total_bounds
+    bounds = joined_gdf.total_bounds  # (minx, miny, maxx, maxy)
+    if not np.any(np.isnan(bounds)):
         sw = [bounds[1], bounds[0]]
         ne = [bounds[3], bounds[2]]
         m.fit_bounds([sw, ne])
@@ -761,7 +814,7 @@ def display_map_with_results():
     st_folium(m, width=700, height=500, key='result_map')
 
 # -------------------------------------------------------------------------
-# ---------------------- Lejupielādes pogas -------------------------------
+# ----------------------- Lejupielādes pogas ------------------------------
 # -------------------------------------------------------------------------
 def display_download_buttons():
     if 'joined_gdf' not in st.session_state or st.session_state['joined_gdf'].empty:
@@ -769,6 +822,10 @@ def display_download_buttons():
         return
 
     joined_gdf = st.session_state['joined_gdf']
+    if joined_gdf.empty:
+        st.error(translations[language]["error_no_data_download"])
+        return
+
     with tempfile.TemporaryDirectory() as tmp_output_dir:
         total_steps = 7
         current_step = 0
@@ -799,7 +856,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 2) Shapefile (ZIP)
+        # 2) SHAPEFILE ZIP
         try:
             progress_text.text(translations[language].get("preparing_shapefile", "2. Sagatavo Shapefile ZIP failu..."))
             shp_output_path = os.path.join(tmp_output_dir, f'{file_name_prefix}.shp')
@@ -844,13 +901,9 @@ def display_download_buttons():
             doc.encoding = 'utf-8'
 
             if 'KKParcel' not in doc.layers:
-                doc.layers.new(name='KKParcel', dxfattribs={
-                    'color': 0, 'linetype': 'Continuous', 'true_color': 0x00FFFF, 'lineweight': 1
-                })
+                doc.layers.new(name='KKParcel', dxfattribs={'color': 0, 'linetype': 'Continuous', 'true_color': 0x00FFFF, 'lineweight': 1})
             if 'KKParcel_txt' not in doc.layers:
-                doc.layers.new(name='KKParcel_txt', dxfattribs={
-                    'color': 0, 'linetype': 'Continuous', 'true_color': 0x00FFFF, 'lineweight': 1
-                })
+                doc.layers.new(name='KKParcel_txt', dxfattribs={'color': 0, 'linetype': 'Continuous', 'true_color': 0x00FFFF, 'lineweight': 1})
 
             if 'Tahoma' not in doc.styles:
                 try:
@@ -869,42 +922,30 @@ def display_download_buttons():
 
                     if geom.type == 'Polygon':
                         exterior_coords = list(geom.exterior.coords)
-                        msp.add_lwpolyline(exterior_coords, dxfattribs={'layer': 'KKParcel', 'lineweight': 1}, close=True)
+                        msp.add_lwpolyline(exterior_coords, dxfattribs={'layer': 'KKParcel'}, close=True)
                         for interior in geom.interiors:
                             interior_coords = list(interior.coords)
-                            msp.add_lwpolyline(interior_coords, dxfattribs={'layer': 'KKParcel', 'lineweight': 1}, close=True)
+                            msp.add_lwpolyline(interior_coords, dxfattribs={'layer': 'KKParcel'}, close=True)
 
                         rep_point = geom.representative_point()
                         text = msp.add_text(
                             text=code_text,
-                            dxfattribs={
-                                'insert': (rep_point.x, rep_point.y),
-                                'height': 1,
-                                'style': 'Tahoma',
-                                'layer': 'KKParcel_txt',
-                                'lineweight': 1
-                            }
+                            dxfattribs={'insert': (rep_point.x, rep_point.y), 'height': 1, 'style': 'Tahoma', 'layer': 'KKParcel_txt'}
                         )
                         text.dxf.halign = TextHAlign.LEFT
 
                     elif geom.type == 'MultiPolygon':
                         for poly in geom.geoms:
                             exterior_coords = list(poly.exterior.coords)
-                            msp.add_lwpolyline(exterior_coords, dxfattribs={'layer': 'KKParcel', 'lineweight': 1}, close=True)
+                            msp.add_lwpolyline(exterior_coords, dxfattribs={'layer': 'KKParcel'}, close=True)
                             for interior in poly.interiors:
                                 interior_coords = list(interior.coords)
-                                msp.add_lwpolyline(interior_coords, dxfattribs={'layer': 'KKParcel', 'lineweight': 1}, close=True)
+                                msp.add_lwpolyline(interior_coords, dxfattribs={'layer': 'KKParcel'}, close=True)
 
                             rep_point = poly.representative_point()
                             text = msp.add_text(
                                 text=code_text,
-                                dxfattribs={
-                                    'insert': (rep_point.x, rep_point.y),
-                                    'height': 1,
-                                    'style': 'Tahoma',
-                                    'layer': 'KKParcel_txt',
-                                    'lineweight': 1
-                                }
+                                dxfattribs={'insert': (rep_point.x, rep_point.y), 'height': 1, 'style': 'Tahoma', 'layer': 'KKParcel_txt'}
                             )
                             text.dxf.halign = TextHAlign.LEFT
 
@@ -927,7 +968,7 @@ def display_download_buttons():
         except Exception as e:
             st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
-        # 4) CSV (tikai "code" kolonna)
+        # 4) CSV (tikai "code")
         try:
             progress_text.text("4. Sagatavo CSV failu ar atlasītajiem kodiem...")
             if 'code' in joined_gdf.columns:
@@ -998,17 +1039,6 @@ def display_download_buttons():
 # -------------------- Galvenā lietotnes saskarne -------------------------
 # -------------------------------------------------------------------------
 def show_main_app():
-    direct_pdf_url = "https://drive.google.com/uc?export=download&id=1jUh4Uq9svZsnAWCkN6VQHW1C0kp1wLws"
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        pass
-    with col2:
-        st.markdown(
-            f'''<a href="{direct_pdf_url}" target="_blank" style="float: right; font-size: 22px; color: #CE2F2C;">
-                <strong>{translations[language]["instructions"]}</strong></a>''',
-            unsafe_allow_html=True
-        )
-
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
 
@@ -1028,9 +1058,8 @@ def show_main_app():
 
     option = st.session_state['input_option']
 
-    # 1) Upload poligonu
+    # (1) Augšupielādē poligonu
     if option == "upload":
-        map_placeholder = st.empty()
         st.markdown(f"""{translations[language]["upload_instruction"]}  
         * **DXF** (.dxf)  
         * **SHP** (.shp, .shx, .dbf, .prj)""")
@@ -1040,6 +1069,7 @@ def show_main_app():
             type=["shp", "shx", "dbf", "prj", "dxf"],
             accept_multiple_files=True
         )
+
         if uploaded_files:
             with tempfile.TemporaryDirectory() as tmpdirname:
                 for uploaded_file in uploaded_files:
@@ -1048,16 +1078,17 @@ def show_main_app():
                         f.write(uploaded_file.getbuffer())
 
                 dxf_files = [os.path.join(tmpdirname, f.name) for f in uploaded_files if f.name.lower().endswith('.dxf')]
+                polygon_gdf = gpd.GeoDataFrame()
                 if dxf_files:
                     polygon_dxf = dxf_files[0]
                     polygon_gdf = read_dxf_to_geodataframe(polygon_dxf)
-                    if polygon_gdf.empty:
-                        st.error(translations[language]["error_upload_dxf"])
-                        polygon_gdf = None
-                    else:
+                    if not polygon_gdf.empty:
                         base_file_name = os.path.splitext(os.path.basename(dxf_files[0]))[0]
                         st.session_state['base_file_name'] = base_file_name
+                    else:
+                        polygon_gdf = gpd.GeoDataFrame()  # Tukšs
                 else:
+                    # Pārbaudām, vai ir SHP
                     required_extensions = ['.shp', '.shx', '.dbf']
                     uploaded_extensions = [os.path.splitext(f.name)[1].lower() for f in uploaded_files]
                     if all(ext in uploaded_extensions for ext in required_extensions):
@@ -1065,37 +1096,36 @@ def show_main_app():
                         if shp_files:
                             polygon_shp = shp_files[0]
                             polygon_gdf = gpd.read_file(polygon_shp)
-                            base_file_name = os.path.splitext(os.path.basename(shp_files[0]))[0]
-                            st.session_state['base_file_name'] = base_file_name
+                            if not polygon_gdf.empty:
+                                base_file_name = os.path.splitext(os.path.basename(shp_files[0]))[0]
+                                st.session_state['base_file_name'] = base_file_name
+                            else:
+                                st.error(translations[language]["error_upload_shp"])
+                                polygon_gdf = gpd.GeoDataFrame()
                         else:
                             st.error(translations[language]["error_upload_shp"])
-                            polygon_gdf = None
                     else:
-                        st.error(
-                            translations[language]["error_display_pdf"].format(
-                                error="Please upload the polygon in one of the selected file formats: DXF or SHP."
-                            )
-                        )
-                        polygon_gdf = None
+                        st.error(translations[language]["error_display_pdf"].format(error="Please upload the polygon in one of the selected file formats: DXF or SHP."))
 
-            if polygon_gdf is not None:
-                st.session_state['polygon_gdf'] = polygon_gdf
-                process_input(polygon_gdf, input_method='upload')
-                if st.session_state.get('data_ready', False):
-                    st.success("Dati veiksmīgi iegūti!")
-            else:
-                st.error(translations[language]["error_display_pdf"].format(error="Could not load polygon from file."))
-                m = folium.Map(location=default_location, zoom_start=7)
-                with map_placeholder:
-                    st_folium(m, width=700, height=500, key='upload_map')
+                if not polygon_gdf.empty and "geometry" in polygon_gdf.columns:
+                    st.session_state['polygon_gdf'] = polygon_gdf
+                    process_input(polygon_gdf, input_method='upload')
+                    if st.session_state.get('data_ready', False):
+                        st.success("Dati veiksmīgi iegūti!")
+                else:
+                    st.info("Neizdevās ielādēt derīgu poligonu. Apskatiet faila saturu.")
+
         else:
             st.info(translations[language]["info_upload"])
-            m = folium.Map(location=default_location, zoom_start=7)
-            st_folium(m, width=700, height=500, key='upload_map')
 
-    # 2) Zīmēt poligonu
+        # Tukša karte
+        m = folium.Map(location=default_location, zoom_start=7)
+        st_folium(m, width=700, height=500, key='upload_map')
+
+    # (2) Zīmēt poligonu
     elif option == "draw":
         st.info(translations[language]["draw_instruction"])
+
         if 'map_center' not in st.session_state:
             st.session_state['map_center'] = [56.946285, 24.105078]
         if 'found_geometry' not in st.session_state:
@@ -1105,10 +1135,10 @@ def show_main_app():
 
         with st.form(key='draw_form'):
             code_text = st.text_input(label=translations[language].get("search_code", "Search by code"), value="")
-            search_col, data_col = st.columns([1, 1])
-            with search_col:
+            colA, colB = st.columns([1,1])
+            with colA:
                 search_button = st.form_submit_button(label=translations[language]["search_button"])
-            with data_col:
+            with colB:
                 submit_button = st.form_submit_button(label=translations[language]["get_data_button"])
 
             if search_button and code_text.strip():
@@ -1123,13 +1153,10 @@ def show_main_app():
 
             current_lat, current_lon = st.session_state['map_center']
             m = folium.Map(location=[current_lat, current_lon], zoom_start=10)
+
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
-            wms_layers = {
-                'Ortofoto': {'layers': 'public:Orto_LKS'},
-                'Kadastra karte': {'layers': 'publicwfs:Kadastra_karte'}
-            }
-            add_wms_layer(m, wms_url, 'Ortofoto' if language == "Latviešu" else 'Orthophoto', wms_layers['Ortofoto']['layers'], overlay=False, opacity=1.0)
-            add_wms_layer(m, wms_url, 'Kadastra karte' if language == "Latviešu" else 'Cadastral map', wms_layers['Kadastra karte']['layers'], overlay=True, opacity=0.5)
+            add_wms_layer(m, wms_url, 'Ortofoto', 'public:Orto_LKS', overlay=False, opacity=1.0)
+            add_wms_layer(m, wms_url, 'Kadastra karte', 'publicwfs:Kadastra_karte', overlay=True, opacity=0.5)
 
             if st.session_state["found_geometry"]:
                 feature_collection = {
@@ -1145,32 +1172,22 @@ def show_main_app():
                 folium.GeoJson(
                     data=feature_collection,
                     name="Kad.apz.",
-                    style_function=lambda x: {"color": "green","fillColor": "yellow","fillOpacity": 0.4,"weight": 2}
+                    style_function=lambda x: {"color":"green","fillColor":"yellow","fillOpacity":0.4,"weight":2}
                 ).add_to(m)
-
-                try:
-                    shape_obj = shapely.geometry.shape(st.session_state["found_geometry"])
-                    centroid = shape_obj.centroid
-                    folium.Marker(
-                        location=[centroid.y, centroid.x],
-                        popup=f"Kad.apz.: {st.session_state.get('found_code', 'N/A')}",
-                        icon=folium.Icon(color='red', icon='info-sign')
-                    ).add_to(m)
-                except Exception as e:
-                    st.error(f"Error adding marker: {e}")
 
             if st.session_state["found_bbox"]:
                 try:
                     minx, miny, maxx, maxy = map(float, st.session_state["found_bbox"])
                     m.fit_bounds([[miny, minx], [maxy, maxx]])
-                except Exception as e:
-                    st.error(f"Error fitting bounds: {e}")
+                except:
+                    pass
 
             drawnItems = folium.FeatureGroup(name="")
             drawnItems.add_to(m)
+
             draw = Draw(
-                draw_options={'polyline': False, 'polygon': True, 'circle': False, 'rectangle': False, 'marker': False, 'circlemarker': False},
-                edit_options={'edit': False, 'remove': True},
+                draw_options={'polyline':False, 'polygon':True, 'circle':False, 'rectangle':False, 'marker':False, 'circlemarker':False},
+                edit_options={'edit':False, 'remove':True},
                 feature_group=drawnItems
             )
             draw.add_to(m)
@@ -1181,26 +1198,29 @@ def show_main_app():
             output = st_folium(m, width=700, height=500, key=map_key)
 
             if submit_button:
+                # Ja kāds poligons tika uzzīmēts
                 if output and 'all_drawings' in output and output['all_drawings']:
                     last_drawing = output['all_drawings'][-1]
                     polygon_gdf = gpd.GeoDataFrame.from_features([last_drawing], crs='EPSG:4326')
-                    st.session_state['polygon_gdf'] = polygon_gdf
-
-                    process_input(polygon_gdf, input_method='drawn')
-                    if st.session_state.get('data_ready', False):
-                        st.success("Dati veiksmīgi iegūti!")
-                        st.session_state['base_file_name'] = 'polygon'
+                    if not polygon_gdf.empty and "geometry" in polygon_gdf.columns:
+                        st.session_state['polygon_gdf'] = polygon_gdf
+                        process_input(polygon_gdf, input_method='drawn')
+                        if st.session_state.get('data_ready', False):
+                            st.success("Dati veiksmīgi iegūti!")
+                            st.session_state['base_file_name'] = 'polygon'
+                    else:
+                        st.error("Neizdevās nolasīt zīmējumu no kartes.")
                 else:
                     st.error(translations[language]["info_draw"])
 
-    # 3) Tikai ievadītajiem kodiem
+    # (3) Tikai ievadītie kodi
     elif option == "code":
         st.info(translations[language]["info_enter_code"])
         with st.form(key='code_form'):
             codes_input = st.text_input(label=translations[language]["enter_codes_label"], value="")
             uploaded_file = st.file_uploader(translations[language]["upload_txt_label"], type=["txt","csv","xlsx"])
-            process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
 
+            process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
             if process_codes:
                 typed_codes = [c.strip() for c in codes_input.split(',') if c.strip()]
                 file_codes = []
@@ -1219,14 +1239,14 @@ def show_main_app():
             display_map_with_results()
             display_download_buttons()
 
-    # 4) Kodus + pierobežniekus
+    # (4) Kodu + pierobežnieki
     elif option == "code_with_adjacent":
         st.info(translations[language]["info_code_filter"])
         with st.form(key='code_with_adjacent_form'):
             codes_input = st.text_input(label=translations[language]["enter_codes_label"], value="")
             uploaded_file = st.file_uploader(translations[language]["upload_txt_label"], type=["txt","csv","xlsx"])
-            process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
 
+            process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
             if process_codes:
                 typed_codes = [c.strip() for c in codes_input.split(',') if c.strip()]
                 file_codes = []
@@ -1245,16 +1265,15 @@ def show_main_app():
             display_map_with_results()
             display_download_buttons()
 
-    # Ja jau dati gatavi (upload/draw)
+    # Ja jau dati gatavi (upload/draw variants)
     if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in ["code", "code_with_adjacent"]:
         display_map_with_results()
         display_download_buttons()
 
     st.markdown("<div style='text-align: center; margin-top: 20px; color: gray;'>© 2024 METRUM</div>", unsafe_allow_html=True)
 
-
 # -------------------------------------------------------------------------
-# ----------------------------- main() ------------------------------------
+# ------------------------------ main() -----------------------------------
 # -------------------------------------------------------------------------
 def main():
     if 'logged_in' not in st.session_state:
@@ -1262,7 +1281,7 @@ def main():
     if 'username_logged' not in st.session_state:
         st.session_state.username_logged = ''
 
-    # Ja gribat reālu login:
+    # Ja jums vajag reālu login, atkomentējiet:
     # if not st.session_state.logged_in:
     #     show_login()
     # else:
