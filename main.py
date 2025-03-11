@@ -1279,67 +1279,7 @@ def show_main_app():
                 else:
                     st.error(translations[language]["info_draw"])
 
-    # (3) Tikai ievadītajiem kadastra kodiem
-    elif option == "code":
-        st.info(translations[language]["info_enter_code"])
-        with st.form(key='code_form'):
-            codes_input = st.text_input(label=translations[language]["enter_codes_label"], value="")
-            uploaded_txt_file = st.file_uploader(
-                translations[language]["upload_txt_label"],
-                type=["txt"]
-            )
-            process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
-
-            if process_codes:
-                typed_codes = [code.strip() for code in codes_input.split(',') if code.strip()]
-                uploaded_codes = []
-                if uploaded_txt_file is not None:
-                    content = uploaded_txt_file.read().decode("utf-8", errors="replace")
-                    uploaded_codes = parse_uploaded_codes(content)
-                all_codes = list(set(typed_codes + uploaded_codes))
-                if not all_codes:
-                    st.error(translations[language]["error_no_codes_entered"])
-                else:
-                    max_codes_in_filename = 5
-                    if len(all_codes) > max_codes_in_filename:
-                        display_codes = "_".join(all_codes[:max_codes_in_filename]) + f"_{len(all_codes)}_codi"
-                    else:
-                        display_codes = "_".join(all_codes)
-                    st.session_state['base_file_name'] = display_codes
-                    process_input(all_codes, input_method='code')
-
-        if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code':
-            display_map_with_results()
-            display_download_buttons()
-
-    # (4) Ievadītajiem kodiem + pierobežnieki
-    elif option == "code_with_adjacent":
-        st.info(translations[language]["info_code_filter"])
-        with st.form(key='code_with_adjacent_form'):
-            codes_input = st.text_input(label=translations[language]["enter_codes_label"], value="")
-            uploaded_txt_file = st.file_uploader(
-                translations[language]["upload_txt_label"],
-                type=["txt"]
-            )
-            process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
-
-            if process_codes:
-                typed_codes = [code.strip() for code in codes_input.split(',') if code.strip()]
-                uploaded_codes = []
-                if uploaded_txt_file is not None:
-                    content = uploaded_txt_file.read().decode("utf-8", errors="replace")
-                    uploaded_codes = parse_uploaded_codes(content)
-                all_codes = list(set(typed_codes + uploaded_codes))
-                if not all_codes:
-                    st.error(translations[language]["error_no_codes_entered"])
-                else:
-                    max_codes_in_filename = 5
-                    if len(all_codes) > max_codes_in_filename:
-                        display_codes = "_".join(all_codes[:max_codes_in_filename]) + f"_{len(all_codes)}_codi"
-                    else:
-                        display_codes = "_".join(all_codes)
-                    st.session_state['base_file_name'] = display_codes
-                    process_input(all_codes, input_method='code_with_adjacent')
+   
 
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
             display_map_with_results()
