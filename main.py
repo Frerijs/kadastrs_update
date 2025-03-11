@@ -104,7 +104,7 @@ translations = {
         "error_no_codes_entered": "Nav ievadīti kadastra apzīmējumi. Lūdzu, ievadiet vienu vai vairākus kadastra apzīmējumus.",
         "error_no_data_found": "Nav atrasti dati ar norādītajiem kadastra numuriem.",
         "info_code_filter": "Dati tiek iegūti gan par norādītajiem kadastra apzīmējumiem, gan pierobežniekiem.",
-        "upload_txt_label": "TXT fails ar kadastra apzīmējumiem (atdalītāji: . , ; : vai atstarpe)"
+#        "upload_txt_label": "TXT fails ar kadastra apzīmējumiem (atdalītāji: . , ; : vai atstarpe)"
     },
     "English": {
         "radio_label": "Select the method to obtain data:",
