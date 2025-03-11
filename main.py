@@ -531,15 +531,15 @@ def search_by_code(code_text):
 # -------------------------------------------------------------------------
 # ---------- Palīgfunkcija .txt failu ar code sarakstu parsēšanai ---------
 # -------------------------------------------------------------------------
-def parse_uploaded_codes(txt_content: str) -> list:
-    """
-    TXT failā var būt kadastra kodi, atdalīti ar . , ; : vai atstarpēm.
-    Pārveido visus atdalītājus uz komatu un sadala.
-    """
-    for delim in [".", ",", ";", ":", " "]:
-        txt_content = txt_content.replace(delim, ",")
-    codes = [c.strip() for c in txt_content.split(",") if c.strip()]
-    return codes
+#def parse_uploaded_codes(txt_content: str) -> list:
+#    """
+#    TXT failā var būt kadastra kodi, atdalīti ar . , ; : vai atstarpēm.
+ #   Pārveido visus atdalītājus uz komatu un sadala.
+  #  """
+   # for delim in [".", ",", ";", ":", " "]:
+    #    txt_content = txt_content.replace(delim, ",")
+    #codes = [c.strip() for c in txt_content.split(",") if c.strip()]
+    #return codes
 
 # -------------------------------------------------------------------------
 # -------- JAUNĀ Palīgfunkcija - chunk pieeja garam code sarakstam --------
