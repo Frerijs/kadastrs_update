@@ -392,6 +392,15 @@ def read_dxf_to_geodataframe(dxf_file_path):
                 vertices_2d = to_2d(vertices)
                 geometries.append(Polygon(vertices_2d))
 
+        # Pārvēršam slēgtas līnijas par poligoniem
+        converted_geometries = []
+        for geom in geometries:
+            if isinstance(geom, LineString) and geom.is_ring:
+                converted_geometries.append(Polygon(geom.coords))
+            else:
+                converted_geometries.append(geom)
+        geometries = converted_geometries
+
         # Apvienojam linijas, ja tādas ir, lai veidotos poligoni
         lines = [geom for geom in geometries if isinstance(geom, LineString)]
         if lines:
@@ -533,8 +542,6 @@ def fetch_code_features(codes_list, chunk_size=50):
         }
         query_url = f"{arcgis_url_base}?{urlencode(params)}"
 
-        # (Pēc vajadzības var izdrukāt testēšanai) st.write(f"Chunk {i+1}/{chunks_count} URL:", query_url)
-
         resp = requests.get(query_url)
         if resp.status_code != 200:
             st.error(f"ArcGIS REST query failed with status code {resp.status_code} (chunk {i+1}/{chunks_count})")
@@ -542,7 +549,6 @@ def fetch_code_features(codes_list, chunk_size=50):
 
         esri_data = resp.json()
         if not esri_data.get('features'):
-            # Tukšs rezultāts šajā gabaliņā
             continue
 
         geojson_data = arcgis2geojson(esri_data)
@@ -561,7 +567,6 @@ def fetch_code_features(codes_list, chunk_size=50):
             all_features_gdf = pd.concat([all_features_gdf, chunk_gdf], ignore_index=True)
 
     if not all_features_gdf.empty:
-        # Nodrošināmies, ka nav dublikātu
         if 'objectid' in all_features_gdf.columns:
             all_features_gdf.drop_duplicates(subset=['objectid', 'code'], inplace=True, ignore_index=True)
         else:
@@ -638,7 +643,7 @@ def process_input(input_data, input_method):
                 arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
             progress_bar.progress(40)
 
-            # Ja "upload", tad mēs atlasām tikai tos, kas pieskaras (touches) augšuplādētajam poligonam
+            # Ja "upload", tad filtrējam pēc intersects, lai iekļautu visus, kas krusto augšupielādēto poligonu.
             if input_method == 'upload':
                 input_union = unary_union(polygon_gdf.geometry)
                 arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.intersects(input_union))]
@@ -655,7 +660,6 @@ def process_input(input_data, input_method):
         elif input_method in ['code', 'code_with_adjacent']:
             codes = input_data  # ievadītie + no .txt faila
 
-            # Izmantojam JAUNO palīgfunkciju ar chunk_size=50
             filtered_gdf = fetch_code_features(codes, chunk_size=50)
             progress_bar.progress(30)
 
@@ -664,14 +668,10 @@ def process_input(input_data, input_method):
                 st.session_state['data_ready'] = False
                 return
 
-            # Pārbaudām, kuri kodi nav atrasti
             missing_codes = set(codes) - set(filtered_gdf['code'].unique())
 
-            # Ja "code_with_adjacent" -> pierobežnieki
             if input_method == 'code_with_adjacent':
                 union_geometry = unary_union(filtered_gdf.geometry)
-
-                # Meklējam bounding envelope
                 bminx, bminy, bmaxx, bmaxy = union_geometry.bounds
                 adjacent_params = {
                     'f': 'json',
@@ -711,7 +711,6 @@ def process_input(input_data, input_method):
                 else:
                     adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
 
-                # Filtrējam tos, kas patiešām pieskaras (touches) union
                 adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(union_geometry)]
                 if adjacent_gdf.empty:
                     st.warning(translations[language]["error_no_data_found"])
@@ -721,12 +720,10 @@ def process_input(input_data, input_method):
                 combined_gdf = pd.concat([filtered_gdf, adjacent_gdf], ignore_index=True).drop_duplicates()
                 joined_gdf = combined_gdf.reset_index(drop=True).fillna('')
             else:
-                # Tikai norādītie kodi
                 joined_gdf = filtered_gdf.copy()
 
             progress_bar.progress(60)
 
-            # Salabojam nederīgas ģeometrijas, ja tādas ir
             if not joined_gdf.empty:
                 invalid_geometries = ~joined_gdf.is_valid
                 if invalid_geometries.any():
@@ -1060,7 +1057,6 @@ def show_main_app():
     st.title(translations[language]["title"])
     default_location = [56.946285, 24.105078]
 
-    # Izvēle, kā iegūt datus
     st.markdown("### " + translations[language]["radio_label"])
     if st.button(translations[language]["methods"][0]):
         st.session_state['input_option'] = "upload"
@@ -1077,9 +1073,7 @@ def show_main_app():
 
     option = st.session_state['input_option']
 
-    # -----------------------------------------------------------
     # (1) Augšupielādē poligonu (DXF/SHP)
-    # -----------------------------------------------------------
     if option == "upload":
         map_placeholder = st.empty()
         st.markdown(f"""{translations[language]["upload_instruction"]}  
@@ -1145,9 +1139,7 @@ def show_main_app():
             m = folium.Map(location=default_location, zoom_start=7)
             st_folium(m, width=700, height=500, key='upload_map')
 
-    # -----------------------------------------------------------
     # (2) Zīmējam poligonu kartē
-    # -----------------------------------------------------------
     elif option == "draw":
         st.info(translations[language]["draw_instruction"])
 
@@ -1179,7 +1171,6 @@ def show_main_app():
             current_lat, current_lon = st.session_state['map_center']
             m = folium.Map(location=[current_lat, current_lon], zoom_start=10)
 
-            # Pievienojam WMS slāņus
             wms_url = "https://lvmgeoserver.lvm.lv/geoserver/ows"
             wms_layers = {
                 'Ortofoto': {'layers': 'public:Orto_LKS'},
@@ -1243,7 +1234,7 @@ def show_main_app():
                 except Exception as e:
                     st.error(f"Error fitting bounds: {e}")
 
-            drawnItems = folium.FeatureGroup(name="")
+            drawnItems = folium.FeatureGroup(name="Drawn Items")
             drawnItems.add_to(m)
 
             draw = Draw(
@@ -1274,33 +1265,24 @@ def show_main_app():
                 else:
                     st.error(translations[language]["info_draw"])
 
-    # -----------------------------------------------------------
     # (3) Tikai ievadītajiem kadastra kodiem
-    # -----------------------------------------------------------
     elif option == "code":
         st.info(translations[language]["info_enter_code"])
         with st.form(key='code_form'):
             codes_input = st.text_input(label=translations[language]["enter_codes_label"], value="")
-            # TXT faila augšupielāde
             uploaded_txt_file = st.file_uploader(
                 translations[language]["upload_txt_label"],
                 type=["txt"]
             )
-
             process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
 
             if process_codes:
                 typed_codes = [code.strip() for code in codes_input.split(',') if code.strip()]
-
-                # Ja ir TXT fails
                 uploaded_codes = []
                 if uploaded_txt_file is not None:
                     content = uploaded_txt_file.read().decode("utf-8", errors="replace")
                     uploaded_codes = parse_uploaded_codes(content)
-
-                # Apvienojam
                 all_codes = list(set(typed_codes + uploaded_codes))
-
                 if not all_codes:
                     st.error(translations[language]["error_no_codes_entered"])
                 else:
@@ -1310,26 +1292,21 @@ def show_main_app():
                     else:
                         display_codes = "_".join(all_codes)
                     st.session_state['base_file_name'] = display_codes
-
                     process_input(all_codes, input_method='code')
 
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code':
             display_map_with_results()
             display_download_buttons()
 
-    # -----------------------------------------------------------
     # (4) Ievadītajiem kodiem + pierobežnieki
-    # -----------------------------------------------------------
     elif option == "code_with_adjacent":
         st.info(translations[language]["info_code_filter"])
         with st.form(key='code_with_adjacent_form'):
             codes_input = st.text_input(label=translations[language]["enter_codes_label"], value="")
-            # TXT faila augšupielāde
             uploaded_txt_file = st.file_uploader(
                 translations[language]["upload_txt_label"],
                 type=["txt"]
             )
-
             process_codes = st.form_submit_button(label=translations[language]["process_codes_button"])
 
             if process_codes:
@@ -1338,9 +1315,7 @@ def show_main_app():
                 if uploaded_txt_file is not None:
                     content = uploaded_txt_file.read().decode("utf-8", errors="replace")
                     uploaded_codes = parse_uploaded_codes(content)
-
                 all_codes = list(set(typed_codes + uploaded_codes))
-
                 if not all_codes:
                     st.error(translations[language]["error_no_codes_entered"])
                 else:
@@ -1350,16 +1325,12 @@ def show_main_app():
                     else:
                         display_codes = "_".join(all_codes)
                     st.session_state['base_file_name'] = display_codes
-
                     process_input(all_codes, input_method='code_with_adjacent')
 
         if st.session_state.get('data_ready', False) and st.session_state['input_method'] == 'code_with_adjacent':
             display_map_with_results()
             display_download_buttons()
 
-    # -----------------------------------------------------------
-    # Ja dati jau gatavi (upload/draw variants)
-    # -----------------------------------------------------------
     if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in ["code", "code_with_adjacent"]:
         display_map_with_results()
         display_download_buttons()
