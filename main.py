@@ -641,7 +641,7 @@ def process_input(input_data, input_method):
             # Ja "upload", tad mēs atlasām tikai tos, kas pieskaras (touches) augšuplādētajam poligonam
             if input_method == 'upload':
                 input_union = unary_union(polygon_gdf.geometry)
-                arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.touches(input_union))]
+                arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.intersects(input_union))]
 
             st.session_state['joined_gdf'] = arcgis_gdf
             st.session_state['data_ready'] = True
