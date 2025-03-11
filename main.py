@@ -333,6 +333,45 @@ def display_pdf(file_path):
         st.error(translations[language]["error_display_pdf"].format(error=str(e)))
 
 # -------------------------------------------------------------------------
+# ------------------- ArcGIS vaicājuma palīgfunkcija -----------------------
+# -------------------------------------------------------------------------
+def fetch_arcgis_data_with_pagination(params, chunk_size=2000):
+    """
+    Veic atkārtotus pieprasījumus ArcGIS FeatureServer (līdz brīdim,
+    kamēr netiek atgriezts viss rezultātu kopums).
+    """
+    all_features = []
+    offset = 0
+
+    while True:
+        # Papildinām params ar paginācijas parametriem
+        params["resultOffset"] = offset
+        params["resultRecordCount"] = chunk_size
+
+        query_url = f"{arcgis_url_base}?{urlencode(params)}"
+        resp = requests.get(query_url)
+        if resp.status_code != 200:
+            st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
+            break
+
+        data = resp.json()
+        if "features" not in data:
+            break
+
+        features = data["features"]
+        all_features.extend(features)
+
+        # Ja serveris norāda, ka ir vairāk datu, turpinām palielinot offset
+        if data.get("exceededTransferLimit"):
+            offset += chunk_size
+        else:
+            break
+
+    # Atgriežam vienu lielu GeoJSON-līdzīgu dict ar "features"
+    data["features"] = all_features
+    return data
+
+# -------------------------------------------------------------------------
 # --------------------- DXF -> GeoDataFrame --------------------------------
 # -------------------------------------------------------------------------
 def read_dxf_to_geodataframe(dxf_file_path):
@@ -459,13 +498,7 @@ def search_by_code(code_text):
             'outSR': '3059',
             'where': f"code = '{code_text}'"
         }
-        query_url = f"{arcgis_url_base}?{urlencode(params)}"
-        response = requests.get(query_url)
-        if response.status_code != 200:
-            st.error(f"ArcGIS query failed with status code {response.status_code}")
-            return None, None, None, None, None
-
-        data = response.json()
+        data = fetch_arcgis_data_with_pagination(params, chunk_size=2000)
         if 'features' not in data or not data['features']:
             st.warning(translations[language]["search_error"])
             return None, None, None, None, None
@@ -515,7 +548,8 @@ def fetch_code_features(codes_list, chunk_size=50):
     """
     Meklē kadastra apzīmējumus 'codes_list' ArcGIS servisā,
     sadalot tos pa gabaliņiem (chunk) ar izmēru 'chunk_size=50',
-    lai nepārsniegtu ArcGIS atļauto limitu.
+    lai nepārsniegtu ArcGIS atļauto limitu vienā pieprasījumā.
+    (Ja vajag, var mainīt chunk_size.)
     """
     import math
     from arcgis2geojson import arcgis2geojson
@@ -529,7 +563,6 @@ def fetch_code_features(codes_list, chunk_size=50):
         end_idx = start_idx + chunk_size
         codes_chunk = codes_list[start_idx:end_idx]
 
-        # Sagatavojam "where" nosacījumu: code IN ('k1','k2',...)
         sanitized_codes = [code.strip().replace("'", "''") for code in codes_chunk]
         codes_str = ",".join([f"'{code}'" for code in sanitized_codes])
 
@@ -540,14 +573,9 @@ def fetch_code_features(codes_list, chunk_size=50):
             'outSR': '3059',
             'where': f"code IN ({codes_str})"
         }
-        query_url = f"{arcgis_url_base}?{urlencode(params)}"
 
-        resp = requests.get(query_url)
-        if resp.status_code != 200:
-            st.error(f"ArcGIS REST query failed with status code {resp.status_code} (chunk {i+1}/{chunks_count})")
-            continue
-
-        esri_data = resp.json()
+        # Izmantojam to pašu paginācijas funkciju, ja ArcGIS atgriež daudz ierakstu
+        esri_data = fetch_arcgis_data_with_pagination(params, chunk_size=2000)
         if not esri_data.get('features'):
             continue
 
@@ -614,24 +642,17 @@ def process_input(input_data, input_method):
                 'outSR': '3059'
             }
 
-            query_url = f"{arcgis_url_base}?{urlencode(params)}"
-            progress_bar.progress(10)
-            resp = requests.get(query_url)
-            if resp.status_code != 200:
-                st.error(f"ArcGIS REST query failed with status code {resp.status_code}")
-                st.session_state['data_ready'] = False
-                return
-
+            # Izmantojam paginācijas funkciju, lai iegūtu *visus* poligonus
+            esri_data = fetch_arcgis_data_with_pagination(params, chunk_size=2000)
             progress_bar.progress(20)
-            esri_data = resp.json()
-            if 'features' not in esri_data or not esri_data['features']:
+
+            if not esri_data.get('features'):
                 st.error(translations[language]["error_no_data_found"])
                 st.session_state['data_ready'] = False
                 return
 
             geojson_data = arcgis2geojson(esri_data)
-            progress_bar.progress(30)
-            if 'features' not in geojson_data or not geojson_data['features']:
+            if not geojson_data.get('features'):
                 st.error(translations[language]["error_no_data_found"])
                 st.session_state['data_ready'] = False
                 return
@@ -643,10 +664,9 @@ def process_input(input_data, input_method):
                 arcgis_gdf = arcgis_gdf.to_crs(epsg=3059)
             progress_bar.progress(40)
 
-            # Ja "upload", tad filtrējam pēc intersects, lai iekļautu visus, kas krusto augšupielādēto poligonu.
-            if input_method == 'upload':
-                input_union = unary_union(polygon_gdf.geometry)
-                arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.intersects(input_union))]
+            # Filtrējam tikai tos, kas tiešām krustojas ar ielādēto poligonu
+            input_union = unary_union(polygon_gdf.geometry)
+            arcgis_gdf = arcgis_gdf[arcgis_gdf.geometry.apply(lambda g: g.intersects(input_union))]
 
             st.session_state['joined_gdf'] = arcgis_gdf
             st.session_state['data_ready'] = True
@@ -691,26 +711,20 @@ def process_input(input_data, input_method):
                     'outSR': '3059'
                 }
 
-                adjacent_query_url = f"{arcgis_url_base}?{urlencode(adjacent_params)}"
-                resp_adjacent = requests.get(adjacent_query_url)
-                if resp_adjacent.status_code != 200:
-                    st.error(f"ArcGIS REST query for adjacent polygons failed with status code {resp_adjacent.status_code}")
-                    st.session_state['data_ready'] = False
-                    return
-
-                esri_adjacent_data = resp_adjacent.json()
-                if 'features' not in esri_adjacent_data or not esri_adjacent_data['features']:
+                esri_adjacent_data = fetch_arcgis_data_with_pagination(adjacent_params, chunk_size=2000)
+                if not esri_adjacent_data.get('features'):
                     st.error(translations[language]["error_no_data_found"])
                     st.session_state['data_ready'] = False
                     return
 
-                geojson_adjacent_data = arcgis2geojson(esri_adjacent_data["features"])
+                geojson_adjacent_data = arcgis2geojson(esri_adjacent_data)
                 adjacent_gdf = gpd.GeoDataFrame.from_features(geojson_adjacent_data)
                 if adjacent_gdf.crs is None:
                     adjacent_gdf.crs = "EPSG:3059"
                 else:
                     adjacent_gdf = adjacent_gdf.to_crs(epsg=3059)
 
+                # Filtrējam tos, kas reāli pieskaras (touches) norādīto poligonu union
                 adjacent_gdf = adjacent_gdf[adjacent_gdf.geometry.touches(union_geometry)]
                 if adjacent_gdf.empty:
                     st.warning(translations[language]["error_no_data_found"])
@@ -1331,6 +1345,7 @@ def show_main_app():
             display_map_with_results()
             display_download_buttons()
 
+    # Ja dati jau gatavi (upload/draw variants)
     if st.session_state.get('data_ready', False) and st.session_state['input_option'] not in ["code", "code_with_adjacent"]:
         display_map_with_results()
         display_download_buttons()
